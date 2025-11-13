@@ -1,15 +1,23 @@
 // src/app/app.routes.ts
 import { Routes } from '@angular/router';
-import { LoginCallbackPage } from './pages/login-callback.page';
-import { DashboardPage } from './pages/dashboard.page';
-import { AuthGuard } from './core/guards/auth.guard';
+import { HomePage } from './pages/home.page';
 import { PublicRegistrationPage } from './features/registration/public-registration.page';
-import { AdminRequestsPage } from './features/admin/admin-requests.page';
+import { AuthGuard } from './core/guards/auth.guard';
 
-export const appRoutes: Routes = [
-  { path: '', component: DashboardPage, canActivate: [AuthGuard] },
-  { path: 'callback', component: LoginCallbackPage },        // retorno OIDC
-  { path: 'registro', component: PublicRegistrationPage },   // público
-  { path: 'admin/solicitudes', component: AdminRequestsPage, canActivate: [AuthGuard] },
+export const routes: Routes = [
+  { path: '', component: HomePage },
+
+  { path: 'callback', loadComponent: () => import('./pages/login-callback.page').then(m => m.LoginCallbackPage) },
+
+  { path: 'registro', component: PublicRegistrationPage },
+
+  {
+    path: 'admin/solicitudes',
+    canActivate: [AuthGuard],
+    loadComponent: () => import('./features/admin/admin-requests.page').then(m => m.AdminRequestsPage),
+  },
+
+  { path: 'activar', loadComponent: () => import('./features/activation/activation.page').then(m => m.ActivationPage) },
+
   { path: '**', redirectTo: '' }
 ];

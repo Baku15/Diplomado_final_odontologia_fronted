@@ -1,17 +1,21 @@
-// src/app/core/guards/auth.guard.ts
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
 import { firstValueFrom } from 'rxjs';
+import { PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
-export const AuthGuard: CanActivateFn = async () => {
+export const AuthGuard: CanActivateFn = async (_route, state: RouterStateSnapshot) => {
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return true; // SSR: no forzar login
+
   const oidc = inject(OidcSecurityService);
   const router = inject(Router);
 
-  // Evita race conditions: espera a checkAuth en el arranque (p.ej. en app root) o maneja aquí
-  const state = await firstValueFrom(oidc.isAuthenticated$);
-  if (state?.isAuthenticated) return true;
+  const authState = await firstValueFrom(oidc.isAuthenticated$);
+  if (authState?.isAuthenticated) return true;
 
+  sessionStorage.setItem('post_login_redirect', state.url || '/');
   oidc.authorize();
   return false;
 };

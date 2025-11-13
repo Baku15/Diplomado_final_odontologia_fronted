@@ -1,25 +1,29 @@
-// src/app/pages/dashboard.page.ts
 import { Component, inject } from '@angular/core';
 import { AuthService } from '../core/services/auth.service';
-import { AsyncPipe, NgIf } from '@angular/common';
+import { AsyncPipe, isPlatformBrowser } from '@angular/common';
+import { PLATFORM_ID } from '@angular/core';
 
 @Component({
   standalone: true,
   selector: 'app-dashboard',
-  imports: [AsyncPipe, NgIf],
+  imports: [AsyncPipe],
   template: `
     <h1>OdontoWeb</h1>
-    <button (click)="login()">Login</button>
-    <button (click)="logout()">Logout</button>
-
-    <div *ngIf="auth.isAuthenticated$ | async as s">
-      <p>Autenticado: {{ s.isAuthenticated }}</p>
-    </div>
+    @if (isBrowser) {
+      <button (click)="login()">Login</button>
+      <button (click)="logout()">Logout</button>
+      @if (auth.isAuthenticated$ | async; as s) { <p>Autenticado: {{ s.isAuthenticated }}</p> }
+    } @else {
+      <p>Cargando...</p>
+    }
   `
 })
 export class DashboardPage {
   auth = inject(AuthService);
-  ngOnInit(){ this.auth.init(); }
-  login(){ this.auth.login(); }
-  logout(){ this.auth.logout(); }
+  private platformId = inject(PLATFORM_ID);
+  isBrowser = isPlatformBrowser(this.platformId);
+
+  ngOnInit(){ if (this.isBrowser) this.auth.init?.(); }
+  login(){ if (this.isBrowser) this.auth.login(); }
+  logout(){ if (this.isBrowser) this.auth.logout(); }
 }

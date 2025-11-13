@@ -1,12 +1,30 @@
-import { mergeApplicationConfig, ApplicationConfig } from '@angular/core';
-import { provideServerRendering, withRoutes } from '@angular/ssr';
-import { appConfig } from './app.config';
-import { serverRoutes } from './app.routes.server';
+import { ApplicationConfig } from '@angular/core';
+import { provideRouter, withEnabledBlockingInitialNavigation } from '@angular/router';
+import { appRoutes } from './app.routes.server';
+import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideAuth, LogLevel } from 'angular-auth-oidc-client';
 
-const serverConfig: ApplicationConfig = {
+// En SSR no hay window: usa un ORIGIN fijo
+const ORIGIN = 'http://localhost:4200';
+
+export const config: ApplicationConfig = {
   providers: [
-    provideServerRendering(withRoutes(serverRoutes))
-  ]
+    provideRouter(appRoutes, withEnabledBlockingInitialNavigation()),
+    provideHttpClient(withFetch()),
+    // 🔐 Proveer la librería también en SSR, con opciones seguras
+    provideAuth({
+      config: {
+        authority: 'http://localhost:8080',
+        clientId: 'odontoweb',
+        redirectUrl: `${ORIGIN}/callback`,
+        postLogoutRedirectUri: ORIGIN,
+        scope: 'openid profile api.read offline_access',
+        responseType: 'code',
+        // En SSR desactiva procesos que podrían tocar window/Timers
+        silentRenew: false,
+        useRefreshToken: true,
+        logLevel: LogLevel.None,
+      },
+    }),
+  ],
 };
-
-export const config = mergeApplicationConfig(appConfig, serverConfig);

@@ -1,0 +1,28 @@
+<h2>Solicitudes pendientes</h2>
+
+<div *ngIf="error" class="error">{{ error }}</div>
+<div *ngIf="loading">Cargando...</div>
+
+<table *ngIf="page && !loading" class="table">
+  <thead>
+  <tr><th>Nombre</th><th>Email</th><th>Fecha</th><th>Acciones</th></tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let r of page!.content">
+    <td>{{ r.nombre }} {{ r.apellido }}</td>
+    <td>{{ r.email }}</td>
+    <td>{{ r.createdAt | date:'short' }}</td>
+    <td>
+      <button (click)="approve(r)">Aprobar</button>
+      <button (click)="reject(r)">Rechazar</button>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+<!-- Paginación: usamos alias 'p' para evitar undefined -->
+<div *ngIf="page as p">
+  <button [disabled]="p.number === 0" (click)="load((p.number||0)-1)">Prev</button>
+  <span>Página {{ p.number + 1 }} / {{ p.totalPages }}</span>
+  <button [disabled]="p.number >= p.totalPages - 1" (click)="load((p.number||0)+1)">Next</button>
+</div>
