@@ -1,29 +1,64 @@
-import { Component, inject } from '@angular/core';
-import { AuthService } from '../core/services/auth.service';
-import { AsyncPipe, isPlatformBrowser } from '@angular/common';
+import { Component, Inject } from '@angular/core';
 import { PLATFORM_ID } from '@angular/core';
+import {AsyncPipe, isPlatformBrowser, NgIf} from '@angular/common';
+import { AuthService } from '../core/services/auth.service';
 
 @Component({
   standalone: true,
   selector: 'app-dashboard',
-  imports: [AsyncPipe],
+  imports: [AsyncPipe, NgIf],
+
   template: `
-    <h1>OdontoWeb</h1>
-    @if (isBrowser) {
-      <button (click)="login()">Login</button>
-      <button (click)="logout()">Logout</button>
-      @if (auth.isAuthenticated$ | async; as s) { <p>Autenticado: {{ s.isAuthenticated }}</p> }
-    } @else {
-      <p>Cargando...</p>
-    }
+    <main style="padding: 1.5rem">
+      <h1>OdontoWeb – Debug de sesión</h1>
+
+      <ng-container *ngIf="isBrowser; else ssr">
+        <div style="margin-top: 1rem; display:flex; gap:.5rem;">
+          <button (click)="login()">Login</button>
+          <button (click)="logout()">Logout</button>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <ng-container *ngIf="(auth.isAuthenticated$ | async); else notAuth">
+            <p>Autenticado: TRUE</p>
+          </ng-container>
+          <ng-template #notAuth>
+            <p>Autenticado: FALSE</p>
+          </ng-template>
+        </div>
+      </ng-container>
+
+      <ng-template #ssr>
+        <p>Cargando...</p>
+      </ng-template>
+    </main>
   `
 })
 export class DashboardPage {
-  auth = inject(AuthService);
-  private platformId = inject(PLATFORM_ID);
-  isBrowser = isPlatformBrowser(this.platformId);
+  isBrowser: boolean;
 
-  ngOnInit(){ if (this.isBrowser) this.auth.init?.(); }
-  login(){ if (this.isBrowser) this.auth.login(); }
-  logout(){ if (this.isBrowser) this.auth.logout(); }
+  constructor(
+    public auth: AuthService,
+    @Inject(PLATFORM_ID) platformId: object
+  ) {
+    this.isBrowser = isPlatformBrowser(platformId);
+  }
+
+  ngOnInit() {
+    if (this.isBrowser) {
+      this.auth.init();   // inicializa estado OIDC / checkAuth
+    }
+  }
+
+  login() {
+    if (this.isBrowser) {
+      this.auth.startLogin();
+    }
+  }
+
+  logout() {
+    if (this.isBrowser) {
+      this.auth.logout();
+    }
+  }
 }

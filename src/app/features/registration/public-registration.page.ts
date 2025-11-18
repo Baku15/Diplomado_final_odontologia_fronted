@@ -1,4 +1,3 @@
-// src/app/features/registration/public-registration.page.ts
 import { Component, inject } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { NgIf } from '@angular/common';
@@ -6,21 +5,42 @@ import { firstValueFrom } from 'rxjs';
 
 import { RegistrationDataAccess } from './registration.data-access';
 import { RegistrationRequestCreateDto } from '../../core/models/registration';
+import { NavbarComponent } from '../../shared/navbar/navbar.component';
+import { RouterLink } from '@angular/router';
 
 @Component({
   standalone: true,
   selector: 'app-public-registration',
-  imports: [ReactiveFormsModule, NgIf],
+  imports: [ReactiveFormsModule, NgIf, NavbarComponent, RouterLink],
   template: `
-    <main class="min-h-screen bg-slate-50 flex items-center justify-center py-10 px-4">
-      <div class="w-full max-w-3xl bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-        <!-- Título -->
+    <!-- NAVBAR COMÚN -->
+    <app-navbar></app-navbar>
+
+    <!-- FONDO CON IMAGEN -->
+    <main
+      class="min-h-screen bg-cover bg-center bg-no-repeat flex items-center justify-center py-10 px-4"
+      style="background-image: url('/assets/img/fondo-diente3.jpg')"
+    >
+      <!-- CAJA BLANCA TIPO GLASS -->
+      <div
+        class="backdrop-blur-sm bg-white/75 p-8 rounded-xl shadow-xl w-full max-w-3xl relative"
+      >
+        <!-- Botón volver -->
+        <button
+          type="button"
+          class="absolute -top-8 left-0 text-sm text-slate-100 hover:text-white underline-offset-2 hover:underline"
+          [routerLink]="'/'"
+        >
+          ← Volver al inicio
+        </button>
+
         <header class="mb-6">
-          <h1 class="text-2xl font-semibold text-slate-900">
-            Registro de usuario
+          <h1 class="text-3xl font-bold text-center mb-2 text-blue-900">
+            Registro de Usuario
           </h1>
-          <p class="mt-1 text-sm text-slate-600">
-            Completa tus datos para que revisemos tu solicitud de acceso a la plataforma.
+          <p class="mt-1 text-sm text-slate-600 text-center">
+            Completa tus datos para que revisemos tu solicitud de acceso a la
+            plataforma.
           </p>
         </header>
 
@@ -41,8 +61,13 @@ import { RegistrationRequestCreateDto } from '../../core/models/registration';
           {{ errorMessage }}
         </div>
 
-        <!-- Formulario -->
-        <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="space-y-6">
+        <!-- FORMULARIO -->
+        <form
+          [formGroup]="form"
+          (ngSubmit)="submit()"
+          novalidate
+          class="space-y-6"
+        >
           <div class="grid gap-4 md:grid-cols-2">
             <!-- Nombre -->
             <div>
@@ -155,6 +180,21 @@ import { RegistrationRequestCreateDto } from '../../core/models/registration';
             </div>
           </div>
 
+
+          <!-- ¿Soy odontólogo? -->
+          <div class="flex items-start gap-2">
+            <input
+              type="checkbox"
+              formControlName="isDentist"
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              id="isDentist"
+            />
+            <label for="isDentist" class="text-sm text-slate-700">
+              Soy odontólogo y atenderé pacientes en esta clínica
+            </label>
+          </div>
+
+
           <!-- Términos -->
           <div class="flex items-start gap-2">
             <input
@@ -163,8 +203,9 @@ import { RegistrationRequestCreateDto } from '../../core/models/registration';
               class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             <p class="text-xs text-slate-600">
-              Confirmo que la información proporcionada es correcta y autorizo el uso de mis datos
-              para fines de gestión clínica conforme a la política de privacidad.
+              Confirmo que la información proporcionada es correcta y autorizo
+              el uso de mis datos para fines de gestión clínica conforme a la
+              política de privacidad.
             </p>
           </div>
           <p
@@ -190,63 +231,65 @@ import { RegistrationRequestCreateDto } from '../../core/models/registration';
         </form>
       </div>
     </main>
-  `
+  `,
 })
 export class PublicRegistrationPage {
   private fb = inject(FormBuilder);
   private api = inject(RegistrationDataAccess);
 
-  isSubmitting = false;
-  submitted = false;
-  successMessage = '';
-  errorMessage = '';
-
-  // usamos un form "ampliado": DTO + aceptaTerminos
   form = this.fb.group({
-    nombre: ['', [Validators.required]],
-    apellido: ['', [Validators.required]],
+    nombre: ['', Validators.required],
+    apellido: ['', Validators.required],
     email: ['', [Validators.required, Validators.email]],
     ocupacion: [''],
     zona: [''],
     direccion: [''],
-    aceptaTerminos: [false, [Validators.requiredTrue]],
+    aceptaTerminos: [false, Validators.requiredTrue],
+    isDentist: [false],
+
   });
+
+  submitted = false;
+  isSubmitting = false;
+  successMessage = '';
+  errorMessage = '';
 
   async submit() {
     this.submitted = true;
-    this.successMessage = '';
     this.errorMessage = '';
+    this.successMessage = '';
 
-    if (this.form.invalid) {
-      return;
-    }
+    if (this.form.invalid) return;
 
     this.isSubmitting = true;
+
     try {
-      const raw = this.form.getRawValue();
-      // sacamos aceptaTerminos antes de llamar al backend
-      const { aceptaTerminos, ...dto } = raw;
-      const payload = dto as RegistrationRequestCreateDto;
+      const value = this.form.value;
+
+      const payload: RegistrationRequestCreateDto = {
+        nombre: value.nombre!,
+        apellido: value.apellido!,
+        email: value.email!,
+        ocupacion: value.ocupacion || '',
+        zona: value.zona || '',
+        direccion: value.direccion || '',
+        isDentist: !!value.isDentist,
+
+      };
 
       await firstValueFrom(this.api.create(payload));
 
       this.successMessage =
-        'Tu solicitud fue enviada correctamente. Te enviaremos un correo cuando sea revisada por el administrador.';
-      this.form.reset({
-        nombre: '',
-        apellido: '',
-        email: '',
-        ocupacion: '',
-        zona: '',
-        direccion: '',
-        aceptaTerminos: false,
-      });
+        'Tu solicitud fue enviada correctamente. Te avisaremos por correo cuando sea revisada.';
+
+      // Reseteamos el formulario y el flag de submitted
+      this.form.reset({ aceptaTerminos: false });
       this.submitted = false;
     } catch (err: any) {
       console.error('Registro error:', err);
-      const backendMsg = err?.error?.message;
       this.errorMessage =
-        backendMsg || 'No se pudo enviar la solicitud. Inténtalo de nuevo más tarde.';
+        err?.error?.message ||
+        'No se pudo enviar la solicitud. Intenta nuevamente en unos minutos.';
     } finally {
       this.isSubmitting = false;
     }

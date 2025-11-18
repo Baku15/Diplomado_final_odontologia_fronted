@@ -6,6 +6,8 @@ export interface RegistrationRequestCreateDto {
   ocupacion?: string;
   zona?: string;
   direccion?: string;
+  isDentist?: boolean;
+
 }
 
 export interface RegistrationRequestViewDto {

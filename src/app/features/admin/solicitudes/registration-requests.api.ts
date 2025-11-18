@@ -20,33 +20,44 @@ export interface Page<T> {
 }
 
 export interface ApprovePayload {
-  username?: string;        // opcional: el admin puede definir el username
-  roleName?: string;        // opcional: normalmente "ROLE_DENTIST"
+  username?: string;
+  roleName?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class RegistrationRequestsApi {
+  // base relativo (mantener para lectura humana)
   private base = '/api/admin/registration-requests';
+
   constructor(private http: HttpClient) {}
 
-  /** 🔹 Listado de solicitudes pendientes */
+  // helper: construye URL absoluta según entorno (browser vs server)
+  private buildUrl(path: string): string {
+    if (typeof window !== 'undefined' && window?.location?.origin) {
+      return `${window.location.origin}${path}`;
+    }
+    // en server/SSR (o procesos node como vite) usar URL directa al backend
+    return `http://localhost:8080${path}`;
+  }
+
   listPending(page = 0, size = 20) {
     const params = new HttpParams()
       .set('status', 'PENDIENTE')
-      .set('page', page)
-      .set('size', size);
-    return this.http.get<Page<RegistrationRequestView>>(this.base, { params });
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    const url = this.buildUrl(this.base);
+    return this.http.get<Page<RegistrationRequestView>>(url, { params });
   }
 
-  /** 🔹 Aprobar solicitud (crea usuario y envía link de activación) */
   approve(id: number, body: ApprovePayload = { roleName: 'ROLE_DENTIST' }) {
-    return this.http.post<void>(`${this.base}/${id}/approve`, body);
+    const url = this.buildUrl(`${this.base}/${id}/approve`);
+    return this.http.post<void>(url, body);
   }
 
-  /** 🔹 Rechazar solicitud con motivo (opcional) */
   reject(id: number, reason = 'Rechazado por el administrador') {
-    // En tu backend puede ser body o parámetro query; si usas query:
     const params = new HttpParams().set('reason', reason);
-    return this.http.post<void>(`${this.base}/${id}/reject`, {}, { params });
+    const url = this.buildUrl(`${this.base}/${id}/reject`);
+    return this.http.post<void>(url, {}, { params });
   }
 }

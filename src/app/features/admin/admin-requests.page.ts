@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import {AuthService} from '../../core/services/auth.service';
 
 interface RegistrationRequestView {
   id: number;
@@ -30,15 +31,27 @@ interface RegistrationRequestView {
               Revisa las solicitudes pendientes y aprueba o rechaza el acceso de nuevos odontólogos.
             </p>
           </div>
-          <button
-            class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            (click)="reload()"
-          >
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-            Actualizar
-          </button>
+
+          <div class="flex items-center gap-3">
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              (click)="reload()"
+            >
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+              Actualizar
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex items-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              (click)="logout()"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </header>
+
 
       <!-- Contenido -->
       <main class="max-w-6xl mx-auto px-4 py-6">
@@ -266,7 +279,9 @@ export class AdminRequestsPage implements OnInit {
   approveUsername: string | null = null;
   rejectReason = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private auth: AuthService  ) {}
 
   ngOnInit() {
     this.reload();
@@ -328,6 +343,10 @@ export class AdminRequestsPage implements OnInit {
           console.error('Error al aprobar solicitud', err);
         },
       });
+  }
+
+  logout() {
+    this.auth.logout();
   }
 
   openReject(r: RegistrationRequestView) {
