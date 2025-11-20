@@ -1,26 +1,29 @@
 // src/app/features/admin/admin.data-access.ts
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import {HttpClient, HttpParams} from '@angular/common/http';
 import { RegistrationRequestViewDto } from '../../core/models/registration';
+import {environment} from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AdminDataAccess {
   private http = inject(HttpClient);
   // nota: aquí tenías '/api/admin/registrations' (distinto a registration-requests)
   // mantenlo si tu backend usa esa ruta; si no, unifícalo.
-  private base = '/api/admin/registrations';
+  private base = `${environment.apiBase}/api/admin/registrations`;
 
+  listPending(page = 0, size = 20) {
+    const params = new HttpParams()
+      .set('page', String(page))
+      .set('size', String(size));
+
+    const url = `${this.base}/pending`;
+    return this.http.get<{ content: RegistrationRequestViewDto[] }>(url, { params });
+  }
   private buildUrl(path: string): string {
     if (typeof window !== 'undefined' && window?.location?.origin) {
       return `${window.location.origin}${path}`;
     }
     return `http://localhost:8080${path}`;
-  }
-
-  listPending(page = 0, size = 20) {
-    const path = `${this.base}/pending?page=${page}&size=${size}`;
-    const url = this.buildUrl(path);
-    return this.http.get<{ content: RegistrationRequestViewDto[] }>(url);
   }
 
   approve(id: number, body: { username?: string; roleName?: string; sendTempPassword?: boolean }) {

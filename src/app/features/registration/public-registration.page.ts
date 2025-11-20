@@ -1,3 +1,4 @@
+// src/app/features/registration/public-registration.page.ts
 import { Component, inject } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { NgIf } from '@angular/common';
@@ -180,7 +181,6 @@ import { RouterLink } from '@angular/router';
             </div>
           </div>
 
-
           <!-- ¿Soy odontólogo? -->
           <div class="flex items-start gap-2">
             <input
@@ -193,7 +193,6 @@ import { RouterLink } from '@angular/router';
               Soy odontólogo y atenderé pacientes en esta clínica
             </label>
           </div>
-
 
           <!-- Términos -->
           <div class="flex items-start gap-2">
@@ -245,8 +244,7 @@ export class PublicRegistrationPage {
     zona: [''],
     direccion: [''],
     aceptaTerminos: [false, Validators.requiredTrue],
-    isDentist: [false],
-
+    isDentist: [false],   // 👈 control para el checkbox
   });
 
   submitted = false;
@@ -273,8 +271,8 @@ export class PublicRegistrationPage {
         ocupacion: value.ocupacion || '',
         zona: value.zona || '',
         direccion: value.direccion || '',
-        isDentist: !!value.isDentist,
-
+        // 👇 aquí el cambio importante: enviamos dentist
+        dentist: !!value.isDentist,
       };
 
       await firstValueFrom(this.api.create(payload));
@@ -282,8 +280,7 @@ export class PublicRegistrationPage {
       this.successMessage =
         'Tu solicitud fue enviada correctamente. Te avisaremos por correo cuando sea revisada.';
 
-      // Reseteamos el formulario y el flag de submitted
-      this.form.reset({ aceptaTerminos: false });
+      this.form.reset({ aceptaTerminos: false, isDentist: false });
       this.submitted = false;
     } catch (err: any) {
       console.error('Registro error:', err);

@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import {AuthService} from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 interface RegistrationRequestView {
   id: number;
@@ -281,7 +282,8 @@ export class AdminRequestsPage implements OnInit {
 
   constructor(
     private http: HttpClient,
-    private auth: AuthService  ) {}
+    private auth: AuthService) {
+  }
 
   ngOnInit() {
     this.reload();
@@ -291,12 +293,13 @@ export class AdminRequestsPage implements OnInit {
     this.loading = true;
 
     const params = new HttpParams()
-      .set('page', 0)
-      .set('size', 20);
+      .set('page', '0')
+      .set('size', '20');
 
-    // 🔧 Ajusta la URL si tu backend usa otra ruta
+    const url = `${environment.apiBase}/api/admin/registration-requests/pending`;
+
     this.http
-      .get<{ content: RegistrationRequestView[] }>('/api/admin/registration-requests/pending', { params })
+      .get<{ content: RegistrationRequestView[] }>(url, {params})
       .subscribe({
         next: (res) => {
           this.requests = res.content ?? [];
@@ -321,6 +324,7 @@ export class AdminRequestsPage implements OnInit {
     this.approveUsername = null;
   }
 
+
   confirmApprove() {
     if (!this.selected) return;
     this.saving = true;
@@ -329,9 +333,10 @@ export class AdminRequestsPage implements OnInit {
       username: this.approveUsername || null,
     };
 
-    // 🔧 Ajusta la URL al endpoint real de tu backend
+    const url = `${environment.apiBase}/api/admin/registration-requests/${this.selected.id}/approve`;
+
     this.http
-      .post<void>(`/api/admin/registration-requests/${this.selected.id}/approve`, body)
+      .post<void>(url, body)
       .subscribe({
         next: () => {
           this.saving = false;
@@ -369,9 +374,10 @@ export class AdminRequestsPage implements OnInit {
       reason: this.rejectReason || '',
     };
 
-    // 🔧 Ajusta la URL al endpoint real de tu backend
+    const url = `${environment.apiBase}/api/admin/registration-requests/${this.selected.id}/reject`;
+
     this.http
-      .post<void>(`/api/admin/registration-requests/${this.selected.id}/reject`, body)
+      .post<void>(url, body)
       .subscribe({
         next: () => {
           this.saving = false;

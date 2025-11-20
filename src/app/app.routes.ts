@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { HomePage } from './pages/home.page';
 import { PublicRegistrationPage } from './features/registration/public-registration.page';
 import { AuthGuard } from './core/guards/auth.guard';
+import { AdminRoleGuard } from './features/admin/solicitudes/admin-role.guard';
 
 export const routes: Routes = [
   { path: '', component: HomePage },
@@ -24,13 +25,33 @@ export const routes: Routes = [
       ),
   },
 
-  // Dashboard dueño de clínica (ROLE_CLINIC_ADMIN)
+  // Dashboard dueño de clínica (ROLE_CLINIC_ADMIN) - panel de staff
   {
     path: 'mi-clinica/dashboard',
     canActivate: [AuthGuard],
     loadComponent: () =>
       import('./features/clinic/clinic-dashboard.page').then(
         (m) => m.ClinicDashboardPage,
+      ),
+  },
+
+  // Dashboard general "Mi clínica"
+  {
+    path: 'mi-clinica',
+    loadComponent: () =>
+      import('./features/clinic/mi-clinica-dashboard.component').then(
+        (m) => m.MiClinicaDashboardComponent,
+      ),
+    canActivate: [AdminRoleGuard],
+  },
+
+  // 🚑 Página para completar perfil de odontólogo
+  {
+    path: 'completar-perfil',
+    canActivate: [AuthGuard],
+    loadComponent: () =>
+      import('./features/clinic/doctor-complete-profile.page').then(
+        (m) => m.DoctorCompleteProfilePage,
       ),
   },
 

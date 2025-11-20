@@ -1,3 +1,4 @@
+// src/app/core/guards/auth.guard.ts
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
@@ -7,27 +8,40 @@ import { isPlatformBrowser } from '@angular/common';
 
 export const AuthGuard: CanActivateFn = async (_route, state: RouterStateSnapshot) => {
   const platformId = inject(PLATFORM_ID);
-  if (!isPlatformBrowser(platformId)) return true; // SSR
+  if (!isPlatformBrowser(platformId)) {
+    // En SSR dejamos pasar para que no rompa el render
+    return true;
+  }
 
   const oidc = inject(OidcSecurityService);
   const router = inject(Router);
 
-  // ⛔ Antes: const isAuth = await firstValueFrom(oidc.isAuthenticated$);
-  // ⭕ Ahora: extraemos correctamente el campo "isAuthenticated"
+  // Estado de autenticación correcto (objeto con isAuthenticated)
   const authState = await firstValueFrom(oidc.isAuthenticated$);
   const isAuth = !!authState?.isAuthenticated;
 
-  console.log("AuthGuard: authState =", authState);
-  console.log("AuthGuard: isAuth =", isAuth);
+  console.log('AuthGuard: isAuth =', isAuth, '→ ruta solicitada =', state.url);
 
+  // Si ya está autenticado, OK
   if (isAuth) {
     return true;
   }
 
-  // guardar ruta solicitada
-  sessionStorage.setItem('post_login_redirect', state.url || '/');
+  // ⚠️ Evitar bucles: NO llamamos authorize() si ya estamos
+  // en el callback OIDC o en completar-perfil
+  if (state.url.includes('callback') || state.url.includes('completar-perfil')) {
+    console.log('AuthGuard: ruta especial (callback/completar-perfil), dejo pasar para evitar bucle.');
+    return true;
+  }
 
-  // iniciar login
+  // Guardar a dónde quería ir
+  try {
+    sessionStorage.setItem('post_login_redirect', state.url || '/');
+  } catch {
+    // ignore
+  }
+
+  console.log('AuthGuard → lanzando authorize() de OIDC...');
   oidc.authorize();
   return false;
 };

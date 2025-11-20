@@ -1,3 +1,4 @@
+//app.config.server.ts
 import { ApplicationConfig } from '@angular/core';
 import { provideRouter, withEnabledBlockingInitialNavigation } from '@angular/router';
 import { appRoutes } from './app.routes.server';

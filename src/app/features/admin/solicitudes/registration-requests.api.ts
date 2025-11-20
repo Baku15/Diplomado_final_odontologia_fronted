@@ -1,6 +1,7 @@
 // src/app/features/admin/solicitudes/registration-requests.api.ts
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import {environment} from '../../../../environments/environment';
 
 export interface RegistrationRequestView {
   id: number;
@@ -33,11 +34,7 @@ export class RegistrationRequestsApi {
 
   // helper: construye URL absoluta según entorno (browser vs server)
   private buildUrl(path: string): string {
-    if (typeof window !== 'undefined' && window?.location?.origin) {
-      return `${window.location.origin}${path}`;
-    }
-    // en server/SSR (o procesos node como vite) usar URL directa al backend
-    return `http://localhost:8080${path}`;
+    return `${environment.apiBase}${path}`;
   }
 
   listPending(page = 0, size = 20) {

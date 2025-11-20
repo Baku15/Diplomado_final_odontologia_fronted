@@ -6,7 +6,7 @@ export interface RegistrationRequestCreateDto {
   ocupacion?: string;
   zona?: string;
   direccion?: string;
-  isDentist?: boolean;
+  dentist: boolean;   // 👈 clave que se mandará al backend
 
 }
 

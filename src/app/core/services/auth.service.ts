@@ -1,11 +1,10 @@
 // src/app/core/services/auth.service.ts
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, of } from 'rxjs';
-import { catchError, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, of, firstValueFrom } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
 import { HttpClient } from '@angular/common/http';
-
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -23,10 +22,6 @@ export class AuthService {
     return typeof u === 'string' && (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//).test(u);
   }
 
-  /**
-   * Inicializa el servicio: intenta recuperar sesión (checkAuth).
-   * Llamar desde el shell o componentes que se carguen al inicio.
-   */
   init(): void {
     const anyOidc: any = this.oidc;
     const candidate = (typeof window !== 'undefined' && this.isAbsoluteUrl(window.location?.href))
@@ -36,14 +31,15 @@ export class AuthService {
     if (typeof anyOidc.checkAuth === 'function') {
       try {
         if (candidate) {
-          anyOidc.checkAuth(candidate).subscribe((res: any) => this.handleCheckAuthResult(res), (err: any) => {
-            console.warn('AuthService.init: checkAuth(candidate) failed, trying fallback', err);
-            try {
-              anyOidc.checkAuth().subscribe((r: any) => this.handleCheckAuthResult(r), (e: any) => this.handleCheckAuthError(e));
-            } catch (e) {
-              this.handleCheckAuthError(e);
-            }
-          });
+          anyOidc.checkAuth(candidate)
+            .subscribe((res: any) => this.handleCheckAuthResult(res), (err: any) => {
+              console.warn('AuthService.init: checkAuth(candidate) failed, trying fallback', err);
+              try {
+                anyOidc.checkAuth().subscribe((r: any) => this.handleCheckAuthResult(r), (e: any) => this.handleCheckAuthError(e));
+              } catch (e) {
+                this.handleCheckAuthError(e);
+              }
+            });
         } else {
           anyOidc.checkAuth().subscribe((res: any) => this.handleCheckAuthResult(res), (err: any) => this.handleCheckAuthError(err));
         }
@@ -58,13 +54,27 @@ export class AuthService {
   private handleCheckAuthResult(res: any) {
     const isAuth = !!res?.isAuthenticated;
     this._isAuthenticated.next(isAuth);
+    // userData puede venir en res.userData o la librería expone userData$
     if (res?.userData) {
       this._userData.next(res.userData);
     } else {
       this._userData.next(null);
     }
-    console.debug('AuthService.checkAuth result:', {isAuthenticated: isAuth, userData: res?.userData ?? null});
+    console.debug('AuthService.checkAuth result:', { isAuthenticated: isAuth, userData: res?.userData ?? null });
   }
+
+  // Devuelve el access token (string) si existe, o '' si no
+  getAccessToken(): string {
+    try {
+      // angular-auth-oidc-client expone getAccessToken() en la instancia OidcSecurityService
+      const token = (this.oidc as any).getAccessToken();
+      return token ?? '';
+    } catch (e) {
+      console.warn('AuthService.getAccessToken: no disponible', e);
+      return '';
+    }
+  }
+
 
   private handleCheckAuthError(err: any) {
     console.warn('AuthService.checkAuth error', err);
@@ -72,10 +82,6 @@ export class AuthService {
     this._userData.next(null);
   }
 
-  /**
-   * Inicia el flujo de login usando la librería (genera state + code_verifier).
-   * Guarda la ruta de retorno en sessionStorage antes de autorizar.
-   */
   startLogin(postLoginRedirect: string = '/') {
     try {
       if (postLoginRedirect && postLoginRedirect.startsWith('/') && !postLoginRedirect.includes('http')) {
@@ -87,10 +93,8 @@ export class AuthService {
       const anyOidc: any = this.oidc;
       if (typeof anyOidc.authorize === 'function') {
         try {
-          // intenta con configId si la versión lo soporta
           anyOidc.authorize('odontoweb');
-        } catch (e) {
-          // fallback sin configId
+        } catch {
           anyOidc.authorize();
         }
         return;
@@ -102,56 +106,24 @@ export class AuthService {
     }
   }
 
-  /**
-   * Logout robusto y awaitable:
-   * - intenta POST /api/auth/revoke (withCredentials: true)
-   * - siempre hace cleanup local (subjects + storage)
-   * - navega al home (router) al finalizar
-   */
   async logout(): Promise<void> {
     const localCleanup = () => {
-      try {
-        this._isAuthenticated.next(false);
-      } catch {
-      }
-      try {
-        this._userData.next(null);
-      } catch {
-      }
-      try {
-        sessionStorage.clear();
-      } catch {
-      }
-      try {
-        localStorage.clear();
-      } catch {
-      }
+      try { this._isAuthenticated.next(false); } catch {}
+      try { this._userData.next(null); } catch {}
+      try { sessionStorage.clear(); } catch {}
+      try { localStorage.clear(); } catch {}
     };
 
-    // 1️⃣ Llamar backend para invalidar sesión JSESSIONID
     try {
       await firstValueFrom(
-        this.http.post('/api/auth/revoke', null, {withCredentials: true})
-          .pipe(catchError(() => of(null)))
+        this.http.post('/api/auth/revoke', null, { withCredentials: true }).pipe(catchError(() => of(null)))
       );
-    } catch {
-    }
+    } catch {}
 
-    // 2️⃣ 🔥 Muy importante: eliminar tokens del OIDC CLIENT
-    try {
-      await this.oidc.logoffLocal();   // ← ESTO ES LA CLAVE
-    } catch (e) {
-      console.warn('logoffLocal falló', e);
-    }
+    try { await (this.oidc as any).logoffLocal(); } catch (e) { console.warn('logoffLocal falló', e); }
 
-    // 3️⃣ Limpieza interna
     localCleanup();
 
-    // 4️⃣ Navegar a home
-    try {
-      await this.router.navigateByUrl('/');
-    } catch {
-      window.location.href = '/';
-    }
+    try { await this.router.navigateByUrl('/'); } catch { window.location.href = '/'; }
   }
 }
