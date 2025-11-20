@@ -1,138 +1,306 @@
 // src/app/features/clinic/doctor-profile-wizard.component.ts
 
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Output,
+  OnInit,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import {
+  ReactiveFormsModule,
+  FormBuilder,
+  Validators,
+} from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environments/environment';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../../environments/environment';
+
+interface ClinicRoomDto {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  active?: boolean;
+}
 
 @Component({
   selector: 'app-doctor-profile-wizard',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-xl p-6">
-      <header class="mb-4">
-        <h2 class="text-xl font-semibold">Completa tu perfil profesional</h2>
-        <p class="text-sm text-slate-500">Esto ayuda a pacientes a conocerte y validar tu práctica.</p>
+    <section class="mt-6 space-y-4">
+      <header>
+        <h2 class="text-lg font-semibold text-slate-900">
+          Completa tu perfil profesional
+        </h2>
+        <p class="text-sm text-slate-600">
+          Esto ayuda a pacientes a conocerte y validar tu práctica.
+        </p>
       </header>
 
-      <div class="mb-4">
-        <div class="w-full bg-slate-100 rounded h-2 overflow-hidden">
-          <div [style.width.%]="progress" class="h-2 bg-emerald-500 transition-all"></div>
-        </div>
-        <div class="text-xs text-slate-500 mt-2">Paso {{ step }} de 3</div>
-      </div>
+      <form
+        [formGroup]="form"
+        (ngSubmit)="save()"
+        class="space-y-6"
+        novalidate
+      >
+        <!-- BLOQUE PRINCIPAL: todo en una pantalla -->
+        <div class="grid gap-4 md:grid-cols-2">
+          <!-- Matrícula -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Matrícula (requerida)
+            </label>
+            <input
+              type="text"
+              formControlName="licenseNumber"
+              class="w-full rounded-lg border px-3 py-2 text-sm
+                     border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="Nº de matrícula profesional"
+            />
+            <p
+              *ngIf="submitted && form.controls['licenseNumber'].invalid"
+              class="mt-1 text-xs text-red-600"
+            >
+              La matrícula es obligatoria.
+            </p>
+          </div>
 
-      <form [formGroup]="form" (ngSubmit)="next()" novalidate>
-        <div *ngIf="step === 1" class="space-y-3">
-          <label class="block text-sm font-medium">Matrícula (requerida)</label>
-          <input formControlName="licenseNumber" class="w-full rounded border px-3 py-2" />
-          <p *ngIf="submitted && form.controls['licenseNumber'].invalid" class="text-xs text-red-600">Matrícula requerida</p>
+          <!-- Especialidad -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Especialidad
+            </label>
+            <select
+              formControlName="specialty"
+              class="w-full rounded-lg border px-3 py-2 text-sm
+                     border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+            >
+              <option value="">Selecciona una opción…</option>
+              <option *ngFor="let s of specialties" [value]="s">
+                {{ s }}
+              </option>
+            </select>
+          </div>
 
-          <label class="block text-sm font-medium">Especialidad</label>
-          <input formControlName="specialty" class="w-full rounded border px-3 py-2" />
-        </div>
+          <!-- Consultorio -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Consultorio principal donde atenderás
+            </label>
 
-        <div *ngIf="step === 2" class="space-y-3">
-          <label class="block text-sm font-medium">Teléfono</label>
-          <input formControlName="phone" class="w-full rounded border px-3 py-2" />
+            <ng-container *ngIf="rooms.length > 0; else noRooms">
+              <select
+                formControlName="mainRoomId"
+                class="w-full rounded-lg border px-3 py-2 text-sm
+                       border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+              >
+                <option
+                  *ngFor="let r of rooms"
+                  [ngValue]="r.id"
+                >
+                  {{ r.name }} ({{ r.code }})
+                </option>
+              </select>
+            </ng-container>
 
-          <label class="block text-sm font-medium">Dirección</label>
-          <input formControlName="address" class="w-full rounded border px-3 py-2" />
+            <ng-template #noRooms>
+              <div class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                Aún no hay consultorios configurados para tu clínica.
+                Pídele al administrador que cree al menos uno.
+              </div>
+            </ng-template>
 
-          <label class="block text-sm font-medium">Breve descripción</label>
-          <textarea formControlName="bio" rows="4" class="w-full rounded border px-3 py-2"></textarea>
-        </div>
+            <p
+              *ngIf="submitted && form.controls['mainRoomId'].invalid"
+              class="mt-1 text-xs text-red-600"
+            >
+              Debes seleccionar un consultorio.
+            </p>
+          </div>
 
-        <div *ngIf="step === 3" class="space-y-3">
-          <h3 class="text-sm font-semibold">Confirma</h3>
-          <dl class="grid grid-cols-1 gap-2">
-            <div><dt class="text-xs text-slate-500">Matrícula</dt><dd class="text-sm">{{ form.value.licenseNumber }}</dd></div>
-            <div><dt class="text-xs text-slate-500">Especialidad</dt><dd class="text-sm">{{ form.value.specialty }}</dd></div>
-            <div><dt class="text-xs text-slate-500">Teléfono</dt><dd class="text-sm">{{ form.value.phone }}</dd></div>
-            <div><dt class="text-xs text-slate-500">Dirección</dt><dd class="text-sm">{{ form.value.address }}</dd></div>
-            <div><dt class="text-xs text-slate-500">Bio</dt><dd class="text-sm whitespace-pre-wrap">{{ form.value.bio }}</dd></div>
-          </dl>
-        </div>
+          <!-- Teléfono -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Teléfono
+            </label>
+            <input
+              type="text"
+              formControlName="phone"
+              class="w-full rounded-lg border px-3 py-2 text-sm
+                     border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="Teléfono de contacto clínico"
+            />
+          </div>
 
-        <div class="mt-6 flex justify-between items-center">
-          <button type="button" (click)="prev()" [disabled]="step===1" class="px-3 py-2 border rounded">Anterior</button>
-          <div class="flex gap-2">
-            <button *ngIf="step<3" type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded">
-              Continuar
-            </button>
-            <button *ngIf="step===3" type="button" (click)="finish()" class="px-4 py-2 bg-indigo-600 text-white rounded">
-              Guardar perfil
-            </button>
-            <button type="button" (click)="closeWizard()" class="px-3 py-2 border rounded">Cancelar</button>
+          <!-- Dirección -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Dirección
+            </label>
+            <input
+              type="text"
+              formControlName="address"
+              class="w-full rounded-lg border px-3 py-2 text-sm
+                     border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="Calle, número, referencia"
+            />
+          </div>
+
+          <!-- Bio -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-slate-700 mb-1">
+              Breve descripción / bio
+            </label>
+            <textarea
+              rows="4"
+              formControlName="bio"
+              class="w-full rounded-lg border px-3 py-2 text-sm
+                     border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="Ej: Odontólogo general con énfasis en rehabilitación oral..."
+            ></textarea>
           </div>
         </div>
-      </form>
 
-      <p *ngIf="error" class="text-xs text-red-600 mt-3">{{ error }}</p>
-      <p *ngIf="success" class="text-xs text-emerald-700 mt-3">{{ success }}</p>
-    </div>
+        <!-- MENSAJES -->
+        <p *ngIf="error" class="text-xs text-red-600">
+          {{ error }}
+        </p>
+        <p *ngIf="success" class="text-xs text-emerald-700">
+          {{ success }}
+        </p>
+
+        <!-- BOTONES -->
+        <div class="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            (click)="closeWizard()"
+            class="px-4 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            [disabled]="isLoading || rooms.length === 0"
+            class="px-5 py-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white
+                   hover:bg-emerald-700 disabled:bg-emerald-300 disabled:cursor-not-allowed"
+          >
+            <span *ngIf="!isLoading">Continuar</span>
+            <span *ngIf="isLoading">Guardando…</span>
+          </button>
+        </div>
+      </form>
+    </section>
   `,
 })
-export class DoctorProfileWizard {
+export class DoctorProfileWizard implements OnInit {
   @Output() close = new EventEmitter<void>();
 
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
 
-  step = 1;
-  progress = 33;
+  // catálogo de especialidades odontológicas
+  specialties: string[] = [
+    'Odontología general',
+    'Odontopediatría',
+    'Ortodoncia',
+    'Endodoncia',
+    'Periodoncia',
+    'Rehabilitación oral / Prótesis',
+    'Cirugía oral y maxilofacial',
+    'Implantología',
+    'Estética dental',
+    'Odontología geriátrica',
+  ];
+
+  rooms: ClinicRoomDto[] = [];
+
   submitted = false;
+  isLoading = false;
   error: string | null = null;
   success: string | null = null;
 
   form = this.fb.group({
     licenseNumber: ['', Validators.required],
     specialty: [''],
+    mainRoomId: [null as number | null, Validators.required],
     phone: [''],
     address: [''],
-    bio: ['']
+    bio: [''],
   });
 
-  // método para usar en plantilla: (click)="close()"
+  async ngOnInit(): Promise<void> {
+    // cargar consultorios de la clínica del usuario
+    try {
+      const me: any = await firstValueFrom(
+        this.http.get(`${environment.apiBase}/api/me`)
+      );
+      const clinicId: number | undefined = me?.clinicId;
+
+      if (clinicId) {
+        const rooms = await firstValueFrom(
+          this.http.get<ClinicRoomDto[]>(
+            `${environment.apiBase}/api/clinic/${clinicId}/rooms`
+          )
+        );
+        this.rooms = rooms.filter((r) => r.active !== false);
+
+        // preseleccionar el primero
+        if (this.rooms.length > 0) {
+          this.form.patchValue({ mainRoomId: this.rooms[0].id });
+        }
+      }
+    } catch (err) {
+      console.warn('DoctorProfileWizard: error cargando consultorios', err);
+    }
+  }
+
   closeWizard() {
     this.close.emit();
   }
 
-  async next() {
+  async save() {
     this.submitted = true;
-    if (this.step === 1 && this.form.controls['licenseNumber'].invalid) return;
-    if (this.step < 3) {
-      this.step++;
-      this.progress = Math.round((this.step / 3) * 100);
-    }
-    this.submitted = false;
-  }
-
-  prev() {
-    if (this.step > 1) {
-      this.step--;
-      this.progress = Math.round((this.step / 3) * 100);
-    }
-  }
-
-  async finish() {
     this.error = null;
     this.success = null;
-    if (this.form.invalid) { this.error = 'Completa los campos requeridos'; return; }
+
+    if (this.form.invalid) {
+      this.error = 'Revisa los campos obligatorios del formulario.';
+      return;
+    }
+
+    this.isLoading = true;
 
     try {
-      const url = `${environment.apiBase}/api/users/me/doctor-profile`;
-      await firstValueFrom(this.http.post(url, this.form.value));
-      this.success = 'Perfil guardado correctamente';
+      const value = this.form.value;
+
+      const payload = {
+        licenseNumber: value.licenseNumber!,
+        specialty: value.specialty || '',
+        phone: value.phone || '',
+        address: value.address || '',
+        bio: value.bio || '',
+        mainRoomId: value.mainRoomId!, // id de consultorio
+      };
+
+      await firstValueFrom(
+        this.http.post(
+          `${environment.apiBase}/api/users/me/doctor-profile`,
+          payload
+        )
+      );
+
+      this.success = 'Perfil guardado correctamente.';
       setTimeout(() => this.close.emit(), 900);
     } catch (err: any) {
       console.error(err);
-      this.error = err?.error?.message || 'Error guardando perfil';
+      this.error =
+        err?.error?.message || 'Ocurrió un error al guardar tu perfil.';
+    } finally {
+      this.isLoading = false;
     }
   }
-
-
 }

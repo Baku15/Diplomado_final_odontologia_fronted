@@ -127,6 +127,12 @@ export class ClinicDashboardPage implements OnInit {
   private http = inject(HttpClient);
   private router = inject(Router);   // 👈 AÑADIR ESTA LÍNEA
 
+  accessInfo = {
+    username: '',
+    email: '',
+    clinicId: null as number | null,
+  };
+
 
   staff: StaffView[] = [];
   loading = false;
@@ -141,6 +147,7 @@ export class ClinicDashboardPage implements OnInit {
   username: string | null = null;
 
   async ngOnInit(): Promise<void> {
+
     try {
       const d: any = await firstValueFrom(this.auth.userData$);
       if (d?.username) this.username = d.username;
