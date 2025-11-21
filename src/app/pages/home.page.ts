@@ -1,4 +1,10 @@
-import { Component, OnInit, PLATFORM_ID, inject } from '@angular/core';
+// src/app/pages/home.page.ts
+import {
+  Component,
+  OnInit,
+  PLATFORM_ID,
+  inject,
+} from '@angular/core';
 import { isPlatformBrowser, NgIf } from '@angular/common';
 
 import { Router } from '@angular/router';
@@ -13,7 +19,7 @@ import { NavbarComponent } from '../shared/navbar/navbar.component';
   standalone: true,
   selector: 'app-home',
   imports: [NgIf, NavbarComponent],
-  styles: [`
+  styles: [/* 👇 tus estilos tal cual, no los toco */ `
     :host {
       display: block;
       min-height: 100vh;
@@ -156,7 +162,6 @@ import { NavbarComponent } from '../shared/navbar/navbar.component';
       font-size: .95rem;
     }
 
-    /* Columna derecha: flujo de acceso */
     .illus {
       position: relative;
       background: linear-gradient(180deg, #eff6ff, #ffffff);
@@ -525,10 +530,9 @@ import { NavbarComponent } from '../shared/navbar/navbar.component';
         </div>
       </footer>
     </main>
-  `
+  `,
 })
 export class HomePage implements OnInit {
-
   private router = inject(Router);
   private auth = inject(AuthService);
   private http = inject(HttpClient);
@@ -544,58 +548,100 @@ export class HomePage implements OnInit {
     try {
       const result = await firstValueFrom(this.oidc.checkAuth());
       if (!result.isAuthenticated) {
-        return;
+        return; // usuario anónimo, se queda en el landing
       }
 
-      // 1) leer redirect deseado de sessionStorage (lo pone AuthService.startLogin)
+      // 1) leer redirect deseado de sessionStorage (lo pone AuthGuard / startLogin)
       let redirectFromStorage: string | null = null;
       try {
         const stored = sessionStorage.getItem('post_login_redirect');
-        if (stored && stored.startsWith('/') && !stored.startsWith('//') && !stored.includes('http')) {
+        if (
+          stored &&
+          stored.startsWith('/') &&
+          !stored.startsWith('//') &&
+          !stored.includes('http')
+        ) {
           redirectFromStorage = stored;
         }
         sessionStorage.removeItem('post_login_redirect');
       } catch (e) {
-        console.warn('No se pudo leer post_login_redirect', e);
+        console.warn('HomePage: no se pudo leer post_login_redirect', e);
       }
 
-      // 2) refinar por roles desde /api/me (incluye CLINIC_ADMIN)
+      // 2) /api/me → roles + mustCompleteProfile
       let redirectByRole: string | null = null;
+      let mustComplete = false;
+      let isDentist = false;
+
       try {
         const me: any = await firstValueFrom(this.http.get('/api/me'));
-        const roles: string[] = me?.roles ?? [];
-        if (roles.includes('ROLE_SUPERUSER')) {
+        console.debug('HomePage: /api/me =', me);
+
+        const roles: string[] = Array.isArray(me?.roles) ? me.roles : [];
+        const rolesNoPrefix = roles.map((r) =>
+          String(r).replace(/^ROLE_/, '')
+        );
+
+        mustComplete = !!me?.mustCompleteProfile;
+        isDentist =
+          roles.includes('ROLE_DENTIST') || rolesNoPrefix.includes('DENTIST');
+
+        if (
+          roles.includes('ROLE_SUPERUSER') ||
+          rolesNoPrefix.includes('SUPERUSER')
+        ) {
           redirectByRole = '/admin/solicitudes';
-        } else if (roles.includes('ROLE_CLINIC_ADMIN')) {
-          redirectByRole = '/mi-clinica/dashboard';
-        } else if (roles.includes('ROLE_DENTIST')) {
+        } else if (
+          roles.includes('ROLE_CLINIC_ADMIN') ||
+          rolesNoPrefix.includes('CLINIC_ADMIN')
+        ) {
+          // 👈 RUTA CORRECTA, NO /mi-clinica/dashboard
+          redirectByRole = '/mi-clinica';
+        } else if (
+          roles.includes('ROLE_DENTIST') ||
+          rolesNoPrefix.includes('DENTIST')
+        ) {
           redirectByRole = '/dashboard';
         }
+        // (aquí podrías añadir ASSISTANT / PATIENT)
       } catch (e) {
-        console.warn('No se pudo leer /api/me', e);
+        console.warn('HomePage: no se pudo leer /api/me', e);
       }
 
-      // 3) decidir prioridad:
-      // - si hay redirect explícito en storage, úsalo
-      // - else si hay redirect por rol, úsalo
-      // - si ninguno, NO navegar (mantener en la ruta actual)
-      let target: string | null = redirectFromStorage ?? redirectByRole ?? null;
+      // 3) decidir destino final:
+      //    prioridad 1: completar perfil
+      //    prioridad 2: redirect guardado
+      //    prioridad 3: redirect por rol
+      let target: string | null = null;
 
-      // Importante: solo navegamos si estamos en la raíz ('/') o si había un redirect en storage.
-      // Esto evita sobrescribir una navegación que ya hizo el LoginCallback u otro componente.
-      const currentlyAtRoot = window.location.pathname === '/' || window.location.pathname === '/index.html';
-      if (target && (redirectFromStorage !== null || currentlyAtRoot)) {
-        this.router.navigateByUrl(target);
+      if (mustComplete && isDentist) {
+        target = '/completar-perfil';
       } else {
-        // No forzamos navegación por defecto; dejamos que el componente que inició el login
-        // (p. ej. LoginCallbackPage) se encargue de redirigir según roles si lo hizo.
-        console.debug('HomePage: no se fuerza redirect, target=', target, ' currentlyAtRoot=', currentlyAtRoot);
+        target = redirectFromStorage ?? redirectByRole ?? null;
+      }
+
+      const currentlyAtRoot =
+        window.location.pathname === '/' ||
+        window.location.pathname === '/index.html';
+
+      if (target && (redirectFromStorage !== null || currentlyAtRoot)) {
+        const ok = await this.router.navigateByUrl(target);
+        if (!ok) {
+          // por si falla el routing (ej. ruta mal escrita)
+          window.location.href = target;
+        }
+      } else {
+        console.debug(
+          'HomePage: no se fuerza redirect, target=',
+          target,
+          ' currentlyAtRoot=',
+          currentlyAtRoot
+        );
       }
     } catch (err) {
-      console.warn('checkAuth (home) error:', err);
+      console.warn('HomePage: checkAuth error:', err);
     }
   }
-
 
   goRegistro(): void {
     this.router.navigateByUrl('/registro');
@@ -603,13 +649,12 @@ export class HomePage implements OnInit {
 
   login(): void {
     if (!this.isBrowser) return;
-    // queremos que después de login vaya a /admin/solicitudes
-    this.auth.startLogin('/admin/solicitudes');
+    // Dejamos que el callback/Home decidan a dónde ir según rol y mustCompleteProfile
+    this.auth.startLogin('/');
   }
 
   resend(e: Event): void {
     e.preventDefault();
-    // aquí luego podrás implementar reenvío de correo de activación
     console.log('TODO: implementar reenvío de activación');
   }
 }

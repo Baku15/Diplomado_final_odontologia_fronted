@@ -231,25 +231,37 @@ export class DoctorProfileWizard implements OnInit {
       const me: any = await firstValueFrom(
         this.http.get(`${environment.apiBase}/api/me`)
       );
+      console.log('DoctorProfileWizard: /api/me =', me);
+
       const clinicId: number | undefined = me?.clinicId;
 
-      if (clinicId) {
-        const rooms = await firstValueFrom(
-          this.http.get<ClinicRoomDto[]>(
-            `${environment.apiBase}/api/clinic/${clinicId}/rooms`
-          )
-        );
-        this.rooms = rooms.filter((r) => r.active !== false);
+      if (!clinicId) {
+        console.warn('DoctorProfileWizard: usuario sin clinicId');
+        return;
+      }
 
-        if (this.rooms.length > 0) {
-          // preseleccionar el primer consultorio
-          this.form.patchValue({ primaryRoomId: this.rooms[0].id });
-        }
+      // 👇 Aceptamos array o objeto por si el backend devuelve una sola room
+      const resp: any = await firstValueFrom(
+        this.http.get<ClinicRoomDto[] | ClinicRoomDto>(
+          `${environment.apiBase}/api/clinic/${clinicId}/rooms`
+        )
+      );
+
+      console.log('DoctorProfileWizard: raw rooms resp =', resp);
+
+      const roomsArray: ClinicRoomDto[] = Array.isArray(resp) ? resp : [resp];
+
+      this.rooms = roomsArray.filter((r) => r && r.active !== false);
+      console.log('DoctorProfileWizard: rooms filtrados =', this.rooms);
+
+      if (this.rooms.length > 0) {
+        this.form.patchValue({ primaryRoomId: this.rooms[0].id });
       }
     } catch (err) {
       console.warn('DoctorProfileWizard: error cargando consultorios', err);
     }
   }
+
 
   closeWizard() {
     this.close.emit();

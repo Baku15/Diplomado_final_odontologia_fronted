@@ -106,31 +106,28 @@ import { AuthService } from '../core/services/auth.service';
             <span class="truncate" *ngIf="!sidebarCollapsed">Resumen</span>
           </a>
 
-          <!-- Doctores (Próx.) -->
+          <!-- Doctores -->
           <a
             routerLink="/mi-clinica/doctores"
             routerLinkActive="bg-white/10 text-white"
             class="flex items-center gap-3 px-3 py-2 text-xs font-medium
-                   rounded-xl hover:bg-white/10 transition-colors opacity-70"
+         rounded-xl hover:bg-white/10 transition-colors"
           >
-            <span class="inline-flex">
-              <svg xmlns="http://www.w3.org/2000/svg"
-                   class="h-5 w-5"
-                   viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="3" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </span>
-            <span class="truncate flex items-center gap-2" *ngIf="!sidebarCollapsed">
-              Doctores
-              <span class="text-[9px] uppercase px-1.5 py-0.5 rounded-full bg-sky-500/40">
-                Próx.
-              </span>
-            </span>
+  <span class="inline-flex">
+    <svg xmlns="http://www.w3.org/2000/svg"
+         class="h-5 w-5"
+         viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="3" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  </span>
+            <span class="truncate" *ngIf="!sidebarCollapsed">
+    Doctores
+  </span>
           </a>
 
           <!-- Pacientes (Próx.) -->

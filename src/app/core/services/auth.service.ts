@@ -1,3 +1,5 @@
+// src/app/core/services/auth.service.ts
+
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { BehaviorSubject, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -24,6 +26,10 @@ export class AuthService {
     return typeof u === 'string' && (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//).test(u);
   }
 
+  /**
+   * Inicializa autenticación OIDC en arranque de app.
+   * NO navega a ninguna ruta, solo actualiza isAuthenticated$ y userData$.
+   */
   init(): void {
     const anyOidc: any = this.oidc;
 
@@ -105,7 +111,15 @@ export class AuthService {
     }
   }
 
-  startLogin(postLoginRedirect: string = '/'): void {
+  /**
+   * Inicia el flujo de login.
+   *
+   * - Si se llama desde un guard, pasar la ruta protegida: startLogin(state.url)
+   *   → se guarda post_login_redirect con esa ruta.
+   * - Si se llama “a mano” (botón Login sin ruta), NO guarda '/'
+   *   → el callback decidirá la ruta según roles.
+   */
+  startLogin(postLoginRedirect?: string): void {
     // 👉 súper importante: NO hacer nada en SSR
     if (!isPlatformBrowser(this.platformId)) {
       console.warn(
@@ -120,9 +134,14 @@ export class AuthService {
         postLoginRedirect.startsWith('/') &&
         !postLoginRedirect.includes('http')
       ) {
+        // Caso típico: llamado desde un guard, queremos volver a esa ruta
         sessionStorage.setItem('post_login_redirect', postLoginRedirect);
       } else {
-        sessionStorage.setItem('post_login_redirect', '/');
+        // Llamado sin ruta específica (p.ej. botón Login en el header):
+        // NO forzamos '/', dejamos que el callback calcule redirect según roles.
+        try {
+          sessionStorage.removeItem('post_login_redirect');
+        } catch {}
       }
 
       const anyOidc: any = this.oidc;
