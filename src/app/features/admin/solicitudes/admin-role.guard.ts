@@ -1,40 +1,49 @@
-import { Injectable } from '@angular/core';
+// src/app/features/admin/solicitudes/admin-role.guard.ts
+
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
-import { OidcSecurityService } from 'angular-auth-oidc-client';
+import { isPlatformBrowser } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import {AuthService} from '../../../core/services/auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class AdminRoleGuard implements CanActivate {
   constructor(
-    private oidc: OidcSecurityService,
-    private authService: AuthService,
-    private router: Router
+    private http: HttpClient,
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
   async canActivate(): Promise<boolean> {
-    // 1) Asegurarnos del estado actual de autenticación (checkAuth procesa el callback si corresponde)
-    const authResult = await firstValueFrom(this.oidc.checkAuth());
-
-    if (!authResult.isAuthenticated) {
-      // No está autenticado: iniciar login guardando la ruta destino
-      this.authService.startLogin('/admin/solicitudes');
-      return false;
+    // 🟡 En SSR (Node) NO llamamos a /api/me porque la URL relativa rompe
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('AdminRoleGuard (SSR): saltando comprobación de /api/me');
+      return true;
     }
 
-    // 2) Ya autenticado: obtener userData y comprobar roles
-    const userData: any = await firstValueFrom(this.oidc.userData$);
-    const roles: string[] = Array.isArray(userData?.roles)
-      ? userData.roles
-      : (userData?.role ? [userData.role] : []);
+    try {
+      const me: any = await firstValueFrom(
+        this.http.get('/api/me', { withCredentials: true })
+      );
+      const roles: string[] = me?.roles ?? [];
 
-    const ok = roles.includes('ROLE_SUPERUSER') || roles.includes('SUPERUSER') || roles.includes('superuser');
-    if (!ok) {
-      // Autenticado pero no superuser: redirigir a home (o a una página 403 según prefieras)
+      console.log('AdminRoleGuard: /api/me =', me);
+
+      const isSuperuser = roles.includes('ROLE_SUPERUSER');
+
+      if (!isSuperuser) {
+        console.warn(
+          'AdminRoleGuard: usuario sin ROLE_SUPERUSER, redirigiendo a /'
+        );
+        this.router.navigateByUrl('/');
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('AdminRoleGuard: error consultando /api/me', err);
       this.router.navigateByUrl('/');
       return false;
     }
-
-    return true;
   }
 }

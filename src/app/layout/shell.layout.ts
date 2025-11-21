@@ -1,3 +1,4 @@
+// src/app/layout/shell.layout.ts
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';

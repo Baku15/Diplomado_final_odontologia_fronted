@@ -1,19 +1,48 @@
-// src/app/core/guards/clinic-admin.guard.ts
-import { Injectable } from '@angular/core';
+// src/app/features/clinic/clinic-admin.guard.ts
+
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
-import { CurrentUserService } from '../services/current-user.service';
+import { isPlatformBrowser } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ClinicAdminGuard implements CanActivate {
-  constructor(private cu: CurrentUserService, private router: Router) {}
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {}
+
   async canActivate(): Promise<boolean> {
+    // 🟡 Igual: en SSR no llamamos al backend con URL relativa
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('ClinicAdminGuard (SSR): saltando comprobación de /api/me');
+      return true;
+    }
+
     try {
-      const ok = await this.cu.isClinicAdmin();
-      if (!ok) await this.router.navigateByUrl('/');
-      return ok;
-    } catch (e) {
-      console.error('ClinicAdminGuard error', e);
-      await this.router.navigateByUrl('/');
+      const me: any = await firstValueFrom(
+        this.http.get('/api/me', { withCredentials: true })
+      );
+      const roles: string[] = me?.roles ?? [];
+
+      console.log('ClinicAdminGuard: /api/me =', me);
+
+      const isClinicAdmin = roles.includes('ROLE_CLINIC_ADMIN');
+
+      if (!isClinicAdmin) {
+        console.warn(
+          'ClinicAdminGuard: usuario sin ROLE_CLINIC_ADMIN, redirigiendo a /'
+        );
+        this.router.navigateByUrl('/');
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('ClinicAdminGuard: error consultando /api/me', err);
+      this.router.navigateByUrl('/');
       return false;
     }
   }

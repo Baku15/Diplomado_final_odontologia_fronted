@@ -1,5 +1,3 @@
-// src/app/pages/login-callback.page.ts
-
 import { Component, OnInit, OnDestroy, inject, PLATFORM_ID } from '@angular/core';
 import { Router, Event as RouterEvent } from '@angular/router';
 import { isPlatformBrowser, NgIf } from '@angular/common';
@@ -47,6 +45,8 @@ export class LoginCallbackPage implements OnInit, OnDestroy {
     try {
       // 1) Procesar callback OIDC
       const checkResult: any = await firstValueFrom(this.oidc.checkAuth());
+      console.debug('LoginCallback: checkAuth() =', checkResult);
+
       if (!checkResult?.isAuthenticated) {
         console.warn('LoginCallback: no autenticado tras checkAuth()', checkResult);
         this.routerEventsSub?.unsubscribe();
@@ -56,83 +56,92 @@ export class LoginCallbackPage implements OnInit, OnDestroy {
 
       this.info = 'Inicio de sesión correcto. Obteniendo información del usuario...';
 
-      // 2) Claims del token
+      // 2) Claims OIDC (por si traen algo útil)
       const userData: any = await firstValueFrom(this.oidc.userData$);
       console.debug('LoginCallback: userData =', userData);
 
-      const rawRoles: any[] = Array.isArray(userData?.roles)
+      // ---- ROLES INICIALES DESDE userData (por si vienen ahí) ----
+      let rawRoles: any[] = Array.isArray(userData?.roles)
         ? userData.roles
         : userData?.role
           ? (Array.isArray(userData.role) ? userData.role : [userData.role])
           : [];
 
-      const roles: string[] = rawRoles.map((r) =>
-        typeof r === 'string' ? r : String(r),
+      let roles: string[] = rawRoles.map(r =>
+        typeof r === 'string' ? r : String(r)
       );
+      let rolesNoPrefix = roles.map(r => r.replace(/^ROLE_/, ''));
 
-      const rolesNoPrefix = roles.map((r) => r.replace(/^ROLE_/, ''));
-      const isDentist =
-        roles.includes('ROLE_DENTIST') || rolesNoPrefix.includes('DENTIST');
-
-      console.log('LoginCallback: roles =', roles, 'isDentist =', isDentist);
-
-      // 3) /api/me → mustCompleteProfile
+      // 3) Obtener /api/me para mustCompleteProfile Y ROLES DEFINITIVOS
       let mustComplete = false;
 
       try {
         const accessToken = this.oidc.getAccessToken();
+
         const me: any = await firstValueFrom(
           this.http.get('/api/me', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }),
+            headers: { Authorization: `Bearer ${accessToken}` }
+          })
         );
 
         console.debug('LoginCallback: /api/me =', me);
         mustComplete = !!me?.mustCompleteProfile;
+
+        // 👇 Aquí sobreescribimos roles con lo que venga del backend
+        if (Array.isArray(me?.roles) && me.roles.length > 0) {
+          roles = me.roles.map((r: any) => String(r));
+          rolesNoPrefix = roles.map(r => r.replace(/^ROLE_/, ''));
+          console.debug(
+            'LoginCallback: roles tomados de /api/me =',
+            roles,
+            rolesNoPrefix
+          );
+        }
+
       } catch (err) {
         console.warn('LoginCallback: fallo obteniendo /api/me', err);
+
+        // Intento alternativo sin header Authorization, usando cookies
         try {
           const me2: any = await firstValueFrom(
-            this.http.get('/api/me', { withCredentials: true }),
+            this.http.get('/api/me', { withCredentials: true })
           );
-          console.debug('LoginCallback: /api/me (cookies) =', me2);
+          console.debug('LoginCallback: /api/me (sin header) =', me2);
+
           mustComplete = !!me2?.mustCompleteProfile;
-        } catch {
-          console.warn('LoginCallback: fallo total al obtener /api/me');
+
+          if (Array.isArray(me2?.roles) && me2.roles.length > 0) {
+            roles = me2.roles.map((r: any) => String(r));
+            rolesNoPrefix = roles.map(r => r.replace(/^ROLE_/, ''));
+            console.debug(
+              'LoginCallback: roles tomados de /api/me (fallback) =',
+              roles,
+              rolesNoPrefix
+            );
+          }
+        } catch (err2) {
+          console.warn('LoginCallback: fallo total al obtener /api/me', err2);
         }
       }
 
-      console.log(
-        'LoginCallback: mustComplete =',
-        mustComplete,
-        'isDentist =',
-        isDentist,
-      );
+      // 4) Si debe completar perfil → ir directo a /completar-perfil (solo si es dentista)
+      const isDentist =
+        roles.includes('ROLE_DENTIST') || rolesNoPrefix.includes('DENTIST');
 
-      // 4) Si es dentista y debe completar perfil → wizard
       if (mustComplete && isDentist) {
         this.info = 'Debes completar tu perfil clínico...';
-        console.log('🚀 Redirigiendo a /completar-perfil');
 
         try {
-          const ok = await this.router.navigateByUrl('/completar-perfil');
-          if (!ok) {
-            console.warn('Router.navigateByUrl("/completar-perfil") devolvió false, forzando location.href');
-            this.routerEventsSub?.unsubscribe();
-            window.location.href = '/completar-perfil';
-            return;
-          }
+          await this.router.navigateByUrl('/completar-perfil');
           this.routerEventsSub?.unsubscribe();
           return;
         } catch {
-          console.error('Error navegando a /completar-perfil, usando location.href');
-          this.routerEventsSub?.unsubscribe();
           window.location.href = '/completar-perfil';
           return;
         }
       }
 
-      // 5) Redirección normal por rol
+      // 5) Calcular redirección por ROL "normal"
       let redirect = '/';
 
       if (roles.includes('ROLE_SUPERUSER') || rolesNoPrefix.includes('SUPERUSER')) {
@@ -147,7 +156,7 @@ export class LoginCallbackPage implements OnInit, OnDestroy {
         redirect = '/paciente/dashboard';
       }
 
-      // intención previa
+      // 6) Reemplazar por intención previa (si el guard la guardó)
       try {
         const saved = sessionStorage.getItem('post_login_redirect');
         if (saved && saved.startsWith('/') && !saved.includes('http')) {
@@ -156,16 +165,18 @@ export class LoginCallbackPage implements OnInit, OnDestroy {
         sessionStorage.removeItem('post_login_redirect');
       } catch {}
 
-      // limpiar URL
+      console.debug('LoginCallback: redirect calculado =', redirect);
+
+      // 7) Limpiar la URL (quitar ?code=...&state=...)
       try {
         window.history.replaceState(
           {},
           document.title,
-          `${window.location.origin}${window.location.pathname}`,
+          `${window.location.origin}${window.location.pathname}`
         );
       } catch {}
 
-      // navegar según rol / intención
+      // 8) Navegar
       try {
         const ok = await this.router.navigateByUrl(redirect);
         if (!ok) {
@@ -179,6 +190,7 @@ export class LoginCallbackPage implements OnInit, OnDestroy {
         this.routerEventsSub?.unsubscribe();
         window.location.href = redirect;
       }
+
     } catch (e) {
       console.error('LoginCallback: excepción', e);
       this.routerEventsSub?.unsubscribe();

@@ -161,6 +161,6 @@ export class DoctorCompleteProfilePage implements OnInit {
 
   onClose() {
     // cuando el wizard emite close → lo mando al panel de su clínica
-    this.router.navigateByUrl('/mi-clinica');
+    this.router.navigateByUrl('/mi-clinica/horarios');
   }
 }

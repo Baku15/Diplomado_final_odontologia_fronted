@@ -1,152 +1,192 @@
 // src/app/features/clinic/mi-clinica-dashboard.component.ts
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule, NgIf } from '@angular/common';
-import {Router, RouterLink} from '@angular/router';
-import { CurrentUserService } from '../../core/services/current-user.service';
-import { ClinicStaffApi } from '../../core/services/clinic-staff.api';
-import { DoctorProfileWizard } from './doctor-profile-wizard.component';
-import { CreateDoctorForm } from './create-doctor-form.component';
-import { CreateAssistantForm } from './create-assistant-form.component';
-import {AuthService} from '../../core/services/auth.service';
+
+import { Component, OnInit, inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser, NgIf } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+
+interface MeResponse {
+  id: number;
+  username: string;
+  email: string;
+  roles: string[];
+  clinicId: number | null;
+  mustCompleteProfile?: boolean;
+  givenName?: string | null;
+  familyName?: string | null;
+  fullName?: string | null;
+}
 
 @Component({
-  selector: 'app-mi-clinica-dashboard',
   standalone: true,
-  imports: [CommonModule, NgIf, RouterLink, DoctorProfileWizard, CreateDoctorForm, CreateAssistantForm],
+  selector: 'app-mi-clinica-dashboard',
+  imports: [CommonModule, NgIf, RouterLink],
   template: `
-    <main class="max-w-6xl mx-auto p-6">
-      <header class="flex items-center justify-between gap-4 mb-6">
+    <!-- El navbar ya lo pone ClinicShellLayout -->
+
+    <section class="w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+      <!-- ENCABEZADO -->
+      <header
+        class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-5
+               flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+      >
         <div>
-          <h1 class="text-2xl font-extrabold text-slate-900">Mi clínica</h1>
-          <p class="text-sm text-slate-500 mt-1">Administra tu clínica, personal y horarios.</p>
+          <p class="text-xs uppercase tracking-wide text-slate-500">
+            Panel administrador de clínica
+          </p>
+          <h1 class="text-2xl font-bold text-slate-900">
+            Hola, {{ displayName || 'Administrador' }} 👋
+          </h1>
+          <p class="text-sm text-slate-600 mt-1">
+            Desde aquí puedes gestionar tu clínica, equipo y horarios.
+          </p>
+          <p *ngIf="clinicId" class="text-xs text-slate-500 mt-1">
+            Clínica asociada:
+            <span class="font-semibold">#{{ clinicId }}</span>
+          </p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button (click)="openWizard()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700">
-            Completar perfil profesional
+        <div class="flex flex-col items-start md:items-end gap-2">
+          <span
+            class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1
+                   text-xs font-medium text-indigo-700"
+          >
+            <span class="h-2 w-2 rounded-full bg-indigo-500"></span>
+            Modo administrador de clínica
+          </span>
+
+          <button
+            *ngIf="isAlsoDentist"
+            type="button"
+            [routerLink]="'/dashboard'"
+            class="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5
+                   text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cambiar a modo odontólogo
           </button>
-          <a routerLink="/" class="px-4 py-2 border rounded-lg text-sm">Volver</a>
         </div>
       </header>
 
-      <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="p-4 rounded-xl bg-white shadow-sm border">
-          <h3 class="text-sm font-semibold text-slate-700 mb-2">Personal</h3>
-          <p class="text-xs text-slate-500">Crea odontólogos y asistentes para tu clínica.</p>
-          <div class="mt-4 flex gap-2">
-            <button (click)="showCreateDoctor = true" class="px-3 py-2 bg-indigo-600 text-white rounded-md">Crear odontólogo</button>
-            <button (click)="showCreateAssistant = true" class="px-3 py-2 border rounded-md">Crear asistente</button>
+      <!-- TARJETAS PRINCIPALES -->
+      <section class="grid gap-4 md:grid-cols-3">
+        <!-- Equipo clínico -->
+        <article
+          class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4
+                 flex flex-col justify-between"
+        >
+          <div class="space-y-1.5">
+            <h2 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              Equipo clínico
+            </h2>
+            <p class="text-xs text-slate-600">
+              Gestiona odontólogos y asistentes que trabajan en tu clínica.
+            </p>
           </div>
-        </div>
+          <div class="mt-4 flex justify-between items-end text-xs text-slate-500">
+            <div>
+              <p>Doctores registrados: —</p>
+              <p>Asistentes: —</p>
+            </div>
+            <!-- por ahora apunta al mismo resumen, luego lo cambiaremos a /mi-clinica/doctores -->
+            <a
+              [routerLink]="'/mi-clinica'"
+              class="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Ver equipo →
+            </a>
+          </div>
+        </article>
 
-        <div class="p-4 rounded-xl bg-white shadow-sm border">
-          <h3 class="text-sm font-semibold text-slate-700 mb-2">Citas</h3>
-          <p class="text-xs text-slate-500">Verás un calendario aquí (próximamente).</p>
-        </div>
+        <!-- Horarios y agenda -->
+        <article
+          class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4
+                 flex flex-col justify-between"
+        >
+          <div class="space-y-1.5">
+            <h2 class="text-sm font-semibold text-slate-900">
+              Horarios de atención
+            </h2>
+            <p class="text-xs text-slate-600">
+              Configura los días y horas en que tu clínica atiende pacientes.
+            </p>
+          </div>
+          <div class="mt-4 flex justify-between items-end text-xs text-slate-500">
+            <div>
+              <p>Configuración por doctor y consultorio.</p>
+            </div>
+            <a
+              [routerLink]="'/mi-clinica/horarios'"
+              class="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Ver / configurar →
+            </a>
+          </div>
+        </article>
 
-        <div class="p-4 rounded-xl bg-white shadow-sm border">
-          <h3 class="text-sm font-semibold text-slate-700 mb-2">Configuración</h3>
-          <p class="text-xs text-slate-500">Permisos, horarios, consultorios, datos fiscales.</p>
-        </div>
+        <!-- Pacientes (futuro) -->
+        <article
+          class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4
+                 flex flex-col justify-between opacity-80"
+        >
+          <div class="space-y-1.5">
+            <h2 class="text-sm font-semibold text-slate-900">
+              Pacientes
+            </h2>
+            <p class="text-xs text-slate-600">
+              Visualiza y gestiona el padrón de pacientes de tu clínica.
+            </p>
+          </div>
+          <div class="mt-4 flex justify-between items-end text-xs text-slate-500">
+            <div>
+              <p>Próximamente: listado y filtros por doctor.</p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center rounded-lg border border-slate-200 px-2 py-1
+                     text-[11px] text-slate-400 cursor-not-allowed"
+            >
+              En construcción
+            </button>
+          </div>
+        </article>
       </section>
-
-      <!-- Modal: Crear odontólogo -->
-      <div *ngIf="showCreateDoctor" class="fixed inset-0 z-50 backdrop-blur-sm flex items-start justify-center pt-20">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
-          <div class="flex justify-end">
-            <button class="text-slate-400" (click)="showCreateDoctor = false" aria-label="Cerrar">✕</button>
-          </div>
-          <app-create-doctor-form
-            [clinicId]="clinicId"
-            (created)="onCreated($event)"
-            (cancel)="showCreateDoctor = false">
-          </app-create-doctor-form>
-        </div>
-      </div>
-
-      <!-- Modal: Crear asistente -->
-      <div *ngIf="showCreateAssistant" class="fixed inset-0 z-50 backdrop-blur-sm flex items-start justify-center pt-20">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-xl p-6">
-          <div class="flex justify-end">
-            <button class="text-slate-400" (click)="showCreateAssistant = false" aria-label="Cerrar">✕</button>
-          </div>
-          <app-create-assistant-form
-            [clinicId]="clinicId"
-            (created)="onCreated($event)"
-            (cancel)="showCreateAssistant = false">
-          </app-create-assistant-form>
-        </div>
-      </div>
-
-      <!-- Wizard perfil odontólogo -->
-      <app-doctor-profile-wizard *ngIf="wizardOpen" (close)="closeWizard()"></app-doctor-profile-wizard>
-    </main>
+    </section>
   `,
 })
 export class MiClinicaDashboardComponent implements OnInit {
-  private cu = inject(CurrentUserService);
-  private api = inject(ClinicStaffApi);
-  private auth = inject(AuthService);
-  private router = inject(Router);
+  private http = inject(HttpClient);
+  private platformId = inject(PLATFORM_ID);
 
+  displayName = '';
   clinicId: number | null = null;
+  isAlsoDentist = false;
 
-  showCreateDoctor = false;
-  showCreateAssistant = false;
-  wizardOpen = false;
+  async ngOnInit(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) return;
 
-  constructor() {
-    // no hacemos async en constructor
-  }
-
-  ngOnInit(): void {
-    this.init();
-  }
-
-  // init robusto: obtiene clinicId (si existe) de los claims del token
-  private async init() {
     try {
-      const cid = await this.cu.getClinicId();
-      if (cid !== null && typeof cid === 'number' && Number.isFinite(cid)) {
-        this.clinicId = cid;
+      const me: MeResponse = await firstValueFrom(
+        this.http.get<MeResponse>('/api/me'),
+      );
+      console.log('MiClinicaDashboard: /api/me =', me);
+
+      this.clinicId = me.clinicId ?? null;
+
+      if (me.fullName) {
+        this.displayName = me.fullName;
+      } else if (me.givenName || me.familyName) {
+        this.displayName = `${me.givenName ?? ''} ${me.familyName ?? ''}`.trim();
       } else {
-        this.clinicId = null;
-        console.warn('MiClinicaDashboard: clinic_id no encontrado en token.');
+        this.displayName = me.username || me.email || '';
       }
+
+      const roles = me.roles || [];
+      this.isAlsoDentist = roles.includes('ROLE_DENTIST');
     } catch (err) {
-      console.error('MiClinicaDashboard: error leyendo clinicId', err);
-      this.clinicId = null;
-    }
-  }
-
-  openWizard() {
-    this.wizardOpen = true;
-  }
-
-  closeWizard() {
-    this.wizardOpen = false;
-  }
-
-  onCreated(event: unknown) {
-    // Evento recibido cuando se creó doctor/assistant.
-    // Puedes mejorar: refrescar listas, mostrar toast, etc.
-    this.showCreateDoctor = false;
-    this.showCreateAssistant = false;
-    // ejemplo simple: recargar datos si necesitas
-    // this.loadStaff();
-    window.setTimeout(() => window.alert('Creación completada'), 50);
-  }
-
-  async logout() {
-    try {
-      await this.auth.logout();
-      // auth.logout ya navega a '/', pero por si acaso:
-      // this.router.navigateByUrl('/');
-    } catch (e) {
-      console.error('Logout error', e);
-      // fallback forzado
-      window.location.href = '/';
+      console.error('MiClinicaDashboard: error obteniendo /api/me', err);
+      this.displayName = 'Administrador';
     }
   }
 }
-

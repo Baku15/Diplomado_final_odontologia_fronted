@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import {AuthService} from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 
 interface RegistrationRequestView {
@@ -23,7 +22,7 @@ interface RegistrationRequestView {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="min-h-screen bg-slate-50">
-      <!-- Header -->
+      <!-- Header interno de la página -->
       <header class="border-b bg-white">
         <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
@@ -41,18 +40,9 @@ interface RegistrationRequestView {
               <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
               Actualizar
             </button>
-
-            <button
-              type="button"
-              class="inline-flex items-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-              (click)="logout()"
-            >
-              Cerrar sesión
-            </button>
           </div>
         </div>
       </header>
-
 
       <!-- Contenido -->
       <main class="max-w-6xl mx-auto px-4 py-6">
@@ -74,60 +64,60 @@ interface RegistrationRequestView {
         >
           <table class="min-w-full divide-y divide-slate-200">
             <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Odontólogo
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Email
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Zona
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Fecha
-                </th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                  Acciones
-                </th>
-              </tr>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Odontólogo
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Email
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Zona
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Fecha
+              </th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Acciones
+              </th>
+            </tr>
             </thead>
             <tbody class="divide-y divide-slate-200">
-              <tr *ngFor="let r of requests">
-                <td class="px-4 py-3">
-                  <div class="text-sm font-medium text-slate-900">
-                    {{ r.nombre }} {{ r.apellido }}
-                  </div>
-                  <div class="text-xs text-slate-500">
-                    {{ r.ocupacion || 'Odontólogo' }}
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  {{ r.email }}
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-600">
-                  {{ r.zona || '—' }}
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-600">
-                  {{ r.createdAt ? (r.createdAt | date: 'short') : '—' }}
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex justify-end gap-2">
-                    <button
-                      class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                      (click)="openReject(r)"
-                    >
-                      Rechazar
-                    </button>
-                    <button
-                      class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 shadow-sm"
-                      (click)="openApprove(r)"
-                    >
-                      Aprobar
-                    </button>
-                  </div>
-                </td>
-              </tr>
+            <tr *ngFor="let r of requests">
+              <td class="px-4 py-3">
+                <div class="text-sm font-medium text-slate-900">
+                  {{ r.nombre }} {{ r.apellido }}
+                </div>
+                <div class="text-xs text-slate-500">
+                  {{ r.ocupacion || 'Odontólogo' }}
+                </div>
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-700">
+                {{ r.email }}
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-600">
+                {{ r.zona || '—' }}
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-600">
+                {{ r.createdAt ? (r.createdAt | date: 'short') : '—' }}
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex justify-end gap-2">
+                  <button
+                    class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                    (click)="openReject(r)"
+                  >
+                    Rechazar
+                  </button>
+                  <button
+                    class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 shadow-sm"
+                    (click)="openApprove(r)"
+                  >
+                    Aprobar
+                  </button>
+                </div>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -280,10 +270,7 @@ export class AdminRequestsPage implements OnInit {
   approveUsername: string | null = null;
   rejectReason = '';
 
-  constructor(
-    private http: HttpClient,
-    private auth: AuthService) {
-  }
+  constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.reload();
@@ -299,7 +286,7 @@ export class AdminRequestsPage implements OnInit {
     const url = `${environment.apiBase}/api/admin/registration-requests/pending`;
 
     this.http
-      .get<{ content: RegistrationRequestView[] }>(url, {params})
+      .get<{ content: RegistrationRequestView[] }>(url, { params, withCredentials: true })
       .subscribe({
         next: (res) => {
           this.requests = res.content ?? [];
@@ -324,7 +311,6 @@ export class AdminRequestsPage implements OnInit {
     this.approveUsername = null;
   }
 
-
   confirmApprove() {
     if (!this.selected) return;
     this.saving = true;
@@ -336,7 +322,7 @@ export class AdminRequestsPage implements OnInit {
     const url = `${environment.apiBase}/api/admin/registration-requests/${this.selected.id}/approve`;
 
     this.http
-      .post<void>(url, body)
+      .post<void>(url, body, { withCredentials: true })
       .subscribe({
         next: () => {
           this.saving = false;
@@ -348,10 +334,6 @@ export class AdminRequestsPage implements OnInit {
           console.error('Error al aprobar solicitud', err);
         },
       });
-  }
-
-  logout() {
-    this.auth.logout();
   }
 
   openReject(r: RegistrationRequestView) {
@@ -377,7 +359,7 @@ export class AdminRequestsPage implements OnInit {
     const url = `${environment.apiBase}/api/admin/registration-requests/${this.selected.id}/reject`;
 
     this.http
-      .post<void>(url, body)
+      .post<void>(url, body, { withCredentials: true })
       .subscribe({
         next: () => {
           this.saving = false;

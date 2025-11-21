@@ -1,4 +1,3 @@
-// src/app/shared/navbar/navbar.component.ts
 import {
   Component,
   inject,
@@ -17,48 +16,61 @@ import { AuthService } from '../../core/services/auth.service';
   selector: 'app-navbar',
   imports: [NgIf, AsyncPipe],
   template: `
-    <header class="bg-white/90 backdrop-blur border-b border-slate-200">
+    <!-- BARRA SUPERIOR A TODO LO ANCHO -->
+    <header
+      class="w-full bg-gradient-to-r from-sky-700 via-sky-600 to-emerald-500
+             text-white shadow-sm"
+    >
       <nav
-        class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4"
+        class="max-w-6xl mx-auto h-14 px-4 flex items-center justify-between gap-4"
       >
-        <!-- Marca / Nombre de la clínica -->
+        <!-- Marca -->
         <button
-          class="text-xl font-bold text-blue-700 flex items-center gap-2 hover:text-blue-800"
+          type="button"
+          class="flex items-center gap-2 bg-transparent border-0 p-0
+                 text-lg md:text-xl font-semibold tracking-tight
+                 hover:opacity-90 cursor-pointer"
           (click)="goHome()"
         >
-          <span>🦷</span>
+          <span class="text-2xl">🦷</span>
           <span>OdontoWeb</span>
         </button>
 
         <!-- Botones -->
-        <div class="flex items-center gap-3" *ngIf="isBrowser">
-          <!-- Siempre mostrar "Inicio" -->
+        <div class="flex items-center gap-2" *ngIf="isBrowser">
+          <!-- Inicio -->
           <button
             type="button"
-            class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200
-                   text-sm font-medium text-slate-800 border border-slate-200"
+            class="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full
+                   text-xs md:text-sm font-medium
+                   bg-white/10 hover:bg-white/20 border border-white/20
+                   transition-colors"
             (click)="goHome()"
           >
             Inicio
           </button>
 
-          <!-- Si NO está autenticado: botón Iniciar sesión -->
+          <!-- Iniciar sesión (cuando NO está autenticado) -->
           <button
             *ngIf="(auth.isAuthenticated$ | async) === false"
             type="button"
-            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700
-                   text-sm font-medium text-white shadow-sm"
+            class="inline-flex items-center px-3 md:px-4 py-1.5 rounded-full
+                   text-xs md:text-sm font-semibold
+                   bg-white text-emerald-700 hover:bg-emerald-50
+                   border border-white/0 shadow-sm transition-colors"
             (click)="login()"
           >
             Iniciar sesión
           </button>
 
-          <!-- Si SÍ está autenticado: botón Cerrar sesión -->
+          <!-- Cerrar sesión (cuando SÍ está autenticado) -->
           <button
             *ngIf="(auth.isAuthenticated$ | async) === true"
             type="button"
-            class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600
-                   text-sm font-medium text-white shadow-sm"
+            class="inline-flex items-center px-3 md:px-4 py-1.5 rounded-full
+                   text-xs md:text-sm font-semibold
+                   bg-rose-500 hover:bg-rose-600
+                   text-white shadow-sm transition-colors"
             (click)="logout()"
           >
             Cerrar sesión
@@ -74,15 +86,12 @@ export class NavbarComponent implements OnInit, OnDestroy {
   private platformId = inject(PLATFORM_ID);
 
   isBrowser = isPlatformBrowser(this.platformId);
-
-  // si en algún momento necesitas un subscription local extra, lo puedes usar.
   private sub?: Subscription;
 
   ngOnInit(): void {
     if (!this.isBrowser) return;
 
-    // Aseguramos que el servicio OIDC intente recuperar sesión una vez
-    // (no rompe si ya se hizo desde el shell).
+    // Por si la app entra por una URL profunda, intentamos recuperar sesión.
     try {
       this.auth.init();
     } catch (e) {
@@ -100,25 +109,17 @@ export class NavbarComponent implements OnInit, OnDestroy {
 
   login(): void {
     if (!this.isBrowser) return;
-
-    // No forzar '/admin/solicitudes' aquí — guarda la raíz o deja que el callback decida según roles.
-    // Si quieres redirigir al lugar actual después del login, usa `window.location.pathname`.
-    const defaultPostLogin = '/'; // <- cambiar si prefieres otra ruta por defecto
-    this.auth.startLogin(defaultPostLogin);
+    // Dejamos que el callback decida adónde ir según roles
+    this.auth.startLogin('/');
   }
-
 
   async logout(): Promise<void> {
     if (!this.isBrowser) return;
-
     try {
-      console.debug('Navbar.logout: calling auth.logout()');
       await this.auth.logout();
-      console.debug('Navbar.logout: auth.logout() resolved');
-    } catch (e) {
-      console.error('Navbar.logout: error calling auth.logout()', e);
-      // fallback: ensure navigation to home
-      this.router.navigateByUrl('/').catch(() => (window.location.href = '/'));
+      await this.router.navigateByUrl('/');
+    } catch {
+      window.location.href = '/';
     }
   }
 }

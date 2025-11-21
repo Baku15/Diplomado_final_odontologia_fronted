@@ -1,61 +1,89 @@
 // src/app/app.routes.ts
+
 import { Routes } from '@angular/router';
 import { HomePage } from './pages/home.page';
 import { PublicRegistrationPage } from './features/registration/public-registration.page';
 import { AuthGuard } from './core/guards/auth.guard';
 import { AdminRoleGuard } from './features/admin/solicitudes/admin-role.guard';
+import {ClinicAdminGuard} from './core/guards/clinic-admin.guard';
 
 export const routes: Routes = [
+  // Página pública inicial
   { path: '', component: HomePage },
 
+  // Callback OIDC
   {
     path: 'callback',
     loadComponent: () =>
-      import('./pages/login-callback.page').then((m) => m.LoginCallbackPage),
+      import('./pages/login-callback.page').then(
+        (m) => m.LoginCallbackPage,
+      ),
   },
 
+  // Registro público
   { path: 'registro', component: PublicRegistrationPage },
 
+  // ============================
+  // ADMIN GLOBAL (SUPERUSER)
+  // ============================
   {
-    path: 'admin/solicitudes',
-    canActivate: [AuthGuard],
+    path: 'admin',
+    canActivate: [AuthGuard, AdminRoleGuard],
     loadComponent: () =>
-      import('./features/admin/admin-requests.page').then(
-        (m) => m.AdminRequestsPage,
-      ),
+      import('./layout/admin-shell.layout').then((m) => m.AdminShellLayout),
+    children: [
+      {
+        path: 'solicitudes',
+        loadComponent: () =>
+          import('./features/admin/admin-requests.page').then(
+            (m) => m.AdminRequestsPage,
+          ),
+      },
+      // /admin → redirige por defecto a /admin/solicitudes
+      { path: '', pathMatch: 'full', redirectTo: 'solicitudes' },
+    ],
   },
 
-  // Dashboard dueño de clínica (ROLE_CLINIC_ADMIN) - panel de staff
-  {
-    path: 'mi-clinica/dashboard',
-    canActivate: [AuthGuard],
-    loadComponent: () =>
-      import('./features/clinic/clinic-dashboard.page').then(
-        (m) => m.ClinicDashboardPage,
-      ),
-  },
-
-  // Dashboard general "Mi clínica"
+  // ============================
+  // MUNDO "MI CLÍNICA"
+  // Layout con sidebar + topbar
+  // ============================
   {
     path: 'mi-clinica',
+    canActivate: [AuthGuard, ClinicAdminGuard], // admin de clínica (y opcionalmente dentista)
     loadComponent: () =>
-      import('./features/clinic/mi-clinica-dashboard.component').then(
-        (m) => m.MiClinicaDashboardComponent,
+      import('./layout/clinic-shell.layout').then(
+        (m) => m.ClinicShellLayout,
       ),
-    canActivate: [AdminRoleGuard],
+    children: [
+      // /mi-clinica  → dashboard general de la clínica
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/clinic/mi-clinica-dashboard.component').then(
+            (m) => m.MiClinicaDashboardComponent,
+          ),
+      },
+
+      // /mi-clinica/horarios → horarios del doctor administrador
+      {
+        path: 'horarios',
+        loadComponent: () =>
+          import('./features/clinic/doctor-schedule.page').then(
+            (m) => m.DoctorSchedulePage,
+          ),
+      },
+
+      // aquí luego vendrán:
+      // /mi-clinica/doctores
+      // /mi-clinica/pacientes
+      // /mi-clinica/ayudantes
+    ],
   },
 
-  // 🚑 Página para completar perfil de odontólogo
-  {
-    path: 'completar-perfil',
-    canActivate: [AuthGuard],
-    loadComponent: () =>
-      import('./features/clinic/doctor-complete-profile.page').then(
-        (m) => m.DoctorCompleteProfilePage,
-      ),
-  },
-
-  // Dashboard dentista (ROLE_DENTIST)
+  // ============================
+  // DASHBOARD DENTISTA (ROLE_DENTIST)
+  // ============================
   {
     path: 'dashboard',
     canActivate: [AuthGuard],
@@ -65,6 +93,17 @@ export const routes: Routes = [
       ),
   },
 
+  // Completar perfil profesional (cuando falta wizard)
+  {
+    path: 'completar-perfil',
+    loadComponent: () =>
+      import('./features/clinic/doctor-complete-profile.page').then(
+        (m) => m.DoctorCompleteProfilePage,
+      ),
+    canActivate: [AuthGuard],
+  },
+
+  // Activación por link de correo
   {
     path: 'activar',
     loadComponent: () =>
@@ -73,5 +112,6 @@ export const routes: Routes = [
       ),
   },
 
+  // Wildcard
   { path: '**', redirectTo: '' },
 ];

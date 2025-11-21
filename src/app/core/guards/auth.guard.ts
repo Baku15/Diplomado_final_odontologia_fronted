@@ -1,6 +1,7 @@
 // src/app/core/guards/auth.guard.ts
+
 import { inject } from '@angular/core';
-import { CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
+import { CanActivateFn, RouterStateSnapshot } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
 import { firstValueFrom } from 'rxjs';
 import { PLATFORM_ID } from '@angular/core';
@@ -9,39 +10,54 @@ import { isPlatformBrowser } from '@angular/common';
 export const AuthGuard: CanActivateFn = async (_route, state: RouterStateSnapshot) => {
   const platformId = inject(PLATFORM_ID);
   if (!isPlatformBrowser(platformId)) {
-    // En SSR dejamos pasar para que no rompa el render
+    // En SSR dejamos pasar; el auth real se hace en el navegador
     return true;
   }
 
   const oidc = inject(OidcSecurityService);
-  const router = inject(Router);
 
-  // Estado de autenticación correcto (objeto con isAuthenticated)
-  const authState = await firstValueFrom(oidc.isAuthenticated$);
-  const isAuth = !!authState?.isAuthenticated;
+  // Procesar/consultar el estado real de auth
+  let authResult: any;
+  try {
+    authResult = await firstValueFrom((oidc as any).checkAuth());
+  } catch (e) {
+    console.warn('AuthGuard: error en checkAuth()', e);
+    authResult = null;
+  }
 
-  console.log('AuthGuard: isAuth =', isAuth, '→ ruta solicitada =', state.url);
+  const isAuth = !!authResult?.isAuthenticated;
+  console.log('AuthGuard: isAuth =', isAuth, 'ruta =', state.url);
 
-  // Si ya está autenticado, OK
   if (isAuth) {
     return true;
   }
 
-  // ⚠️ Evitar bucles: NO llamamos authorize() si ya estamos
-  // en el callback OIDC o en completar-perfil
-  if (state.url.includes('callback') || state.url.includes('completar-perfil')) {
-    console.log('AuthGuard: ruta especial (callback/completar-perfil), dejo pasar para evitar bucle.');
-    return true;
-  }
-
-  // Guardar a dónde quería ir
+  // Guardar intención de ruta
   try {
-    sessionStorage.setItem('post_login_redirect', state.url || '/');
-  } catch {
-    // ignore
+    if (state.url && state.url.startsWith('/') && !state.url.includes('http')) {
+      sessionStorage.setItem('post_login_redirect', state.url);
+    } else {
+      sessionStorage.setItem('post_login_redirect', '/');
+    }
+  } catch (err) {
+    console.warn('AuthGuard: no se pudo usar sessionStorage', err);
   }
 
-  console.log('AuthGuard → lanzando authorize() de OIDC...');
-  oidc.authorize();
+  // Redirigir al Authorization Server
+  try {
+    const anyOidc: any = oidc;
+    if (typeof anyOidc.authorize === 'function') {
+      try {
+        anyOidc.authorize('odontoweb');
+      } catch {
+        anyOidc.authorize();
+      }
+    } else {
+      console.error('AuthGuard: authorize() no existe en OidcSecurityService');
+    }
+  } catch (e) {
+    console.error('AuthGuard: error al invocar authorize()', e);
+  }
+
   return false;
 };
