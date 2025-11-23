@@ -9,6 +9,18 @@ import { firstValueFrom } from 'rxjs';
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
 import { DoctorProfileWizard } from './doctor-profile-wizard.component';
 
+interface MeResponse {
+  id: number;
+  username: string;
+  email: string;
+  roles: string[];
+  clinicId: number | null;
+  mustCompleteProfile?: boolean;
+  givenName?: string | null;
+  familyName?: string | null;
+  fullName?: string | null;
+}
+
 @Component({
   standalone: true,
   selector: 'app-doctor-complete-profile-page',
@@ -24,7 +36,7 @@ import { DoctorProfileWizard } from './doctor-profile-wizard.component';
             Completa tu perfil profesional
           </h1>
           <p class="mt-1 text-sm text-slate-600 max-w-3xl">
-            Como odontólogo administrador de clínica debes completar estos datos
+            Como odontólogo de clínica debes completar estos datos
             antes de empezar a atender pacientes en la plataforma.
           </p>
         </header>
@@ -49,8 +61,17 @@ import { DoctorProfileWizard } from './doctor-profile-wizard.component';
 
               <div class="px-6 py-5">
                 <app-doctor-profile-wizard
+                  *ngIf="isDentist && mustCompleteProfile"
                   (close)="onClose()"
                 ></app-doctor-profile-wizard>
+
+                <!-- Mensaje de seguridad por si carga brevemente sin condiciones -->
+                <p
+                  *ngIf="!isDentist || !mustCompleteProfile"
+                  class="text-xs text-slate-500"
+                >
+                  Verificando información de tu perfil...
+                </p>
               </div>
             </div>
           </div>
@@ -102,7 +123,7 @@ import { DoctorProfileWizard } from './doctor-profile-wizard.component';
                   </dd>
                 </div>
 
-                <!-- Chips de roles (opcional, pero útil visualmente) -->
+                <!-- Chips de roles -->
                 <div
                   class="flex flex-col pt-2 border-t border-dashed border-slate-200"
                   *ngIf="accessInfo.roles.length"
@@ -140,27 +161,68 @@ export class DoctorCompleteProfilePage implements OnInit {
     roles: [] as string[],
   };
 
+  isDentist = false;
+  isClinicAdmin = false;
+  mustCompleteProfile = false;
+
   async ngOnInit(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
 
     try {
-      const me: any = await firstValueFrom(this.http.get('/api/me'));
+      const me: MeResponse = await firstValueFrom(
+        this.http.get<MeResponse>('/api/me')
+      );
       console.log('DoctorCompleteProfile: /api/me =', me);
 
       this.accessInfo.username = me?.username ?? '';
       this.accessInfo.email = me?.email ?? '';
       this.accessInfo.clinicId = me?.clinicId ?? null;
       this.accessInfo.clinicDisplay =
-        me?.clinicName ??
+        me?.fullName ??
         (me?.clinicId ? `Clínica #${me.clinicId}` : 'Sin clínica asignada');
       this.accessInfo.roles = Array.isArray(me?.roles) ? me.roles : [];
+
+      const roles = this.accessInfo.roles;
+
+      this.isDentist = roles.includes('ROLE_DENTIST');
+      this.isClinicAdmin = roles.includes('ROLE_CLINIC_ADMIN');
+      this.mustCompleteProfile = !!me.mustCompleteProfile;
+
+      // 1) Si NO es dentista, no debería estar aquí
+      if (!this.isDentist) {
+        if (this.isClinicAdmin) {
+          await this.router.navigateByUrl('/mi-clinica');
+        } else {
+          await this.router.navigateByUrl('/');
+        }
+        return;
+      }
+
+      // 2) Es dentista, pero ya completó su perfil
+      if (this.isDentist && !this.mustCompleteProfile) {
+        if (this.isClinicAdmin) {
+          await this.router.navigateByUrl('/mi-clinica');
+        } else {
+          await this.router.navigateByUrl('/dashboard');
+        }
+        return;
+      }
     } catch (err) {
       console.error('DoctorCompleteProfile: error obteniendo /api/me', err);
+      try {
+        await this.router.navigateByUrl('/');
+      } catch {}
     }
   }
 
   onClose() {
-    // cuando el wizard emite close → lo mando al panel de su clínica
-    this.router.navigateByUrl('/mi-clinica/horarios');
+    // cuando el wizard emite close:
+    // - si también es admin de clínica → lo mando a horarios de su clínica
+    // - si solo es dentista → a su dashboard de dentista
+    if (this.isClinicAdmin) {
+      this.router.navigateByUrl('/mi-clinica/horarios');
+    } else {
+      this.router.navigateByUrl('/dashboard');
+    }
   }
 }

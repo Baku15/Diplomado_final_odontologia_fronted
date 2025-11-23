@@ -12,6 +12,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Router } from '@angular/router';
 
 interface ClinicRoomDto {
   id: number;
@@ -37,6 +38,7 @@ interface ClinicRoomDto {
       </header>
 
       <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
+
         <!-- Fila 1: Matrícula + Especialidad -->
         <div class="grid gap-4 md:grid-cols-2">
           <div>
@@ -75,36 +77,81 @@ interface ClinicRoomDto {
           </div>
         </div>
 
-        <!-- Fila 2: Consultorio principal -->
-        <div>
-          <label class="block text-xs font-medium text-slate-700 mb-1">
-            Consultorio principal donde atenderás
-            <span class="text-red-500">*</span>
-          </label>
+        <!-- Fila 2: Consultorio principal O mensaje de "no hay consultorios" -->
+        <ng-container *ngIf="rooms.length > 0; else noRoomsTpl">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">
+              Consultorio principal donde atenderás
+              <span class="text-red-500">*</span>
+            </label>
 
-          <select
-            formControlName="primaryRoomId"
-            class="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
-                   focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            <select
+              formControlName="primaryRoomId"
+              class="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm
+                     focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option [ngValue]="null">Seleccione un consultorio…</option>
+              <option *ngFor="let r of rooms" [ngValue]="r.id">
+                {{ r.name }} ({{ r.code }})
+              </option>
+            </select>
+
+            <p
+              *ngIf="submitted && form.controls['primaryRoomId'].invalid"
+              class="mt-1 text-[11px] text-red-600"
+            >
+              Debes seleccionar un consultorio principal.
+            </p>
+
+            <p *ngIf="selectedRoom" class="mt-1 text-[11px] text-slate-500">
+              Consultorio seleccionado:
+              {{ selectedRoom.name }} ({{ selectedRoom.code }})
+            </p>
+          </div>
+        </ng-container>
+
+        <!-- Cuando NO hay consultorios -->
+        <ng-template #noRoomsTpl>
+          <!-- Caso 1: admin + dentista → puede configurar consultorios -->
+          <div
+            *ngIf="isClinicAdmin; else noRoomsDentistTpl"
+            class="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-3 text-[11px] text-amber-900"
           >
-            <option [ngValue]="null">Seleccione un consultorio…</option>
-            <option *ngFor="let r of rooms" [ngValue]="r.id">
-              {{ r.name }} ({{ r.code }})
-            </option>
-          </select>
+            <p class="font-semibold mb-1">
+              Aún no tienes consultorios configurados en tu clínica.
+            </p>
+            <p class="mb-2">
+              Antes de completar tu perfil profesional, necesitas crear al menos
+              un consultorio donde atenderás pacientes.
+            </p>
+            <button
+              type="button"
+              (click)="goToCreateRoom()"
+              class="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white/70
+                     px-3 py-1.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              Configurar consultorio ahora
+            </button>
+          </div>
 
-          <p
-            *ngIf="submitted && form.controls['primaryRoomId'].invalid"
-            class="mt-1 text-[11px] text-red-600"
-          >
-            Debes seleccionar un consultorio principal.
-          </p>
-
-          <p *ngIf="selectedRoom" class="mt-1 text-[11px] text-slate-500">
-            Consultorio seleccionado:
-            {{ selectedRoom.name }} ({{ selectedRoom.code }})
-          </p>
-        </div>
+          <!-- Caso 2: solo dentista → debe pedir al admin -->
+          <ng-template #noRoomsDentistTpl>
+            <div
+              class="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-3 text-[11px] text-amber-900"
+            >
+              <p class="font-semibold mb-1">
+                Tu clínica aún no tiene consultorios configurados.
+              </p>
+              <p class="mb-1">
+                Para completar tu perfil profesional, el administrador de la clínica
+                debe crear al menos un consultorio y asignarte uno como lugar de atención.
+              </p>
+              <p>
+                Comunícate con administración para que lo configuren y luego vuelve a esta pantalla.
+              </p>
+            </div>
+          </ng-template>
+        </ng-template>
 
         <!-- Fila 3: Teléfono + Dirección -->
         <div class="grid gap-4 md:grid-cols-2">
@@ -170,7 +217,7 @@ interface ClinicRoomDto {
 
           <button
             type="submit"
-            [disabled]="isLoading"
+            [disabled]="isLoading || rooms.length === 0"
             class="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-xs font-semibold
                    text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60
                    disabled:cursor-not-allowed"
@@ -188,8 +235,10 @@ export class DoctorProfileWizard implements OnInit {
 
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
+  private router = inject(Router);
 
-  // catálogo de especialidades odontológicas
+  private readonly wizardFlagKey = 'from_doctor_wizard_needs_room';
+
   specialties: string[] = [
     'Odontología general',
     'Odontopediatría',
@@ -210,10 +259,13 @@ export class DoctorProfileWizard implements OnInit {
   error: string | null = null;
   success: string | null = null;
 
+  // 👇 Nuevos flags de rol
+  isClinicAdmin = false;
+  isDentist = false;
+
   form = this.fb.group({
     licenseNumber: ['', Validators.required],
     specialty: [''],
-    // 👇 alineado con el backend: primaryRoomId
     primaryRoomId: [null as number | null, Validators.required],
     phone: [''],
     address: [''],
@@ -233,6 +285,11 @@ export class DoctorProfileWizard implements OnInit {
       );
       console.log('DoctorProfileWizard: /api/me =', me);
 
+      // Roles desde /api/me
+      const roles: string[] = Array.isArray(me?.roles) ? me.roles : [];
+      this.isClinicAdmin = roles.includes('ROLE_CLINIC_ADMIN');
+      this.isDentist = roles.includes('ROLE_DENTIST');
+
       const clinicId: number | undefined = me?.clinicId;
 
       if (!clinicId) {
@@ -240,7 +297,6 @@ export class DoctorProfileWizard implements OnInit {
         return;
       }
 
-      // 👇 Aceptamos array o objeto por si el backend devuelve una sola room
       const resp: any = await firstValueFrom(
         this.http.get<ClinicRoomDto[] | ClinicRoomDto>(
           `${environment.apiBase}/api/clinic/${clinicId}/rooms`
@@ -262,6 +318,12 @@ export class DoctorProfileWizard implements OnInit {
     }
   }
 
+  goToCreateRoom() {
+    try {
+      sessionStorage.setItem(this.wizardFlagKey, '1');
+    } catch {}
+    this.router.navigateByUrl('/mi-clinica/consultorios');
+  }
 
   closeWizard() {
     this.close.emit();
@@ -272,7 +334,7 @@ export class DoctorProfileWizard implements OnInit {
     this.error = null;
     this.success = null;
 
-    if (this.form.invalid) {
+    if (this.form.invalid || this.rooms.length === 0) {
       this.error = 'Revisa los campos obligatorios del formulario.';
       return;
     }
@@ -288,7 +350,6 @@ export class DoctorProfileWizard implements OnInit {
         phone: value.phone || '',
         address: value.address || '',
         bio: value.bio || '',
-        // 👇 ahora usamos el valor del formulario, sin selectedRoomId fantasma
         primaryRoomId: value.primaryRoomId!,
       };
 

@@ -50,8 +50,12 @@ interface DoctorWeeklyScheduleDto {
   imports: [CommonModule, FormsModule, NgIf, NgFor, NgClass],
   template: `
     <main class="min-h-screen bg-slate-50">
-      <section class="max-w-6xl mx-auto px-4 py-8">
-        <header class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section class="max-w-6xl mx-auto px-4 py-8 space-y-5">
+
+        <!-- ENCABEZADO -->
+        <header
+          class="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        >
           <div>
             <h1 class="text-2xl font-bold text-slate-900">
               Horarios de atención
@@ -62,7 +66,9 @@ interface DoctorWeeklyScheduleDto {
             </p>
           </div>
 
+          <!-- 👇 Solo mostrar cuando aún NO tiene ningún horario guardado -->
           <button
+            *ngIf="!hasExistingSchedule"
             type="button"
             class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
             (click)="volverDespuesDeConfigurar()"
@@ -71,12 +77,42 @@ interface DoctorWeeklyScheduleDto {
           </button>
         </header>
 
-        <!-- Mensajes -->
-        <div *ngIf="errorMessage" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+        <!-- TIP RÁPIDO / ACCIONES -->
+        <section
+          class="bg-sky-50/80 border border-sky-100 text-[11px] text-sky-900 rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        >
+          <div>
+            <p class="font-semibold">
+              Sugerencia rápida
+            </p>
+            <p class="mt-0.5">
+              Marca los días que atiendes: se rellenarán horas por defecto
+              (08:00–12:00). Luego puedes ajustarlas con las flechas de cada campo.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-lg bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-sky-800 border border-sky-200 hover:bg-white"
+            (click)="copyMondayToWeekdays()"
+            [disabled]="!days[0].working"
+          >
+            <span>Copiar horario de lunes a martes–viernes</span>
+          </button>
+        </section>
+
+        <!-- MENSAJES -->
+        <div
+          *ngIf="errorMessage"
+          class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"
+        >
           {{ errorMessage }}
         </div>
 
-        <div *ngIf="successMessage" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+        <div
+          *ngIf="successMessage"
+          class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700"
+        >
           {{ successMessage }}
         </div>
 
@@ -102,9 +138,9 @@ interface DoctorWeeklyScheduleDto {
                 *ngFor="let d of days"
                 class="border-b last:border-b-0 border-slate-100"
                 [ngClass]="{
-                    'bg-slate-50/60': d.working,
-                    'bg-white': !d.working
-                  }"
+                  'bg-slate-50/70': d.working,
+                  'bg-white': !d.working
+                }"
               >
                 <!-- Día -->
                 <td class="px-3 py-2 text-slate-700 font-medium">
@@ -130,9 +166,12 @@ interface DoctorWeeklyScheduleDto {
                     type="time"
                     [(ngModel)]="d.startTime"
                     [disabled]="!d.working"
+                    step="900"
+                    min="06:00"
+                    max="21:00"
                     class="w-full rounded border px-2 py-1 text-xs
-                             border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
-                             disabled:bg-slate-100 disabled:text-slate-400"
+                           border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
+                           disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </td>
 
@@ -142,9 +181,12 @@ interface DoctorWeeklyScheduleDto {
                     type="time"
                     [(ngModel)]="d.endTime"
                     [disabled]="!d.working"
+                    step="900"
+                    min="06:00"
+                    max="21:00"
                     class="w-full rounded border px-2 py-1 text-xs
-                             border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
-                             disabled:bg-slate-100 disabled:text-slate-400"
+                           border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
+                           disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </td>
 
@@ -154,6 +196,7 @@ interface DoctorWeeklyScheduleDto {
                     <input
                       type="checkbox"
                       [(ngModel)]="d.giveBreak"
+                      (ngModelChange)="onBreakToggle(d)"
                       [disabled]="!d.working"
                       class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
@@ -167,9 +210,12 @@ interface DoctorWeeklyScheduleDto {
                     type="time"
                     [(ngModel)]="d.breakStart"
                     [disabled]="!d.working || !d.giveBreak"
+                    step="900"
+                    min="06:00"
+                    max="21:00"
                     class="w-full rounded border px-2 py-1 text-xs
-                             border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
-                             disabled:bg-slate-100 disabled:text-slate-400"
+                           border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
+                           disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </td>
 
@@ -179,9 +225,12 @@ interface DoctorWeeklyScheduleDto {
                     type="time"
                     [(ngModel)]="d.breakEnd"
                     [disabled]="!d.working || !d.giveBreak"
+                    step="900"
+                    min="06:00"
+                    max="21:00"
                     class="w-full rounded border px-2 py-1 text-xs
-                             border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
-                             disabled:bg-slate-100 disabled:text-slate-400"
+                           border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
+                           disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </td>
 
@@ -194,8 +243,8 @@ interface DoctorWeeklyScheduleDto {
                     [(ngModel)]="d.chairs"
                     [disabled]="!d.working"
                     class="w-16 rounded border px-2 py-1 text-xs
-                             border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
-                             disabled:bg-slate-100 disabled:text-slate-400"
+                           border-slate-300 focus:border-indigo-500 focus:ring-indigo-500
+                           disabled:bg-slate-100 disabled:text-slate-400"
                   />
                 </td>
               </tr>
@@ -238,18 +287,27 @@ export class DoctorSchedulePage implements OnInit {
   errorMessage = '';
   successMessage = '';
 
+  // 👇 indica si ya tenía al menos un día con horario en BD
+  hasExistingSchedule = false;
+
   // para decidir a dónde redirigir
   isClinicAdmin = false;
 
+  // Horarios por defecto cuando marca "Atiende"
+  private readonly defaultStart = '08:00';
+  private readonly defaultEnd   = '12:00';
+  private readonly defaultBreakStart = '10:00';
+  private readonly defaultBreakEnd   = '10:30';
+
   // Modelo de horarios
   days: DoctorDayScheduleVm[] = [
-    { dayOfWeek: 1, label: 'Lunes',    working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 2, label: 'Martes',   working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 3, label: 'Miércoles',working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 4, label: 'Jueves',   working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 5, label: 'Viernes',  working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 6, label: 'Sábado',   working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
-    { dayOfWeek: 7, label: 'Domingo',  working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 1, label: 'Lunes',     working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 2, label: 'Martes',    working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 3, label: 'Miércoles', working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 4, label: 'Jueves',    working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 5, label: 'Viernes',   working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 6, label: 'Sábado',    working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
+    { dayOfWeek: 7, label: 'Domingo',   working: false, startTime: null, endTime: null, giveBreak: false, breakStart: null, breakEnd: null, chairs: 1 },
   ];
 
   async ngOnInit(): Promise<void> {
@@ -277,14 +335,19 @@ export class DoctorSchedulePage implements OnInit {
           const serverDay = weekly.days.find(x => x.dayOfWeek === d.dayOfWeek);
           if (!serverDay) continue;
 
-          d.working = serverDay.working;
-          d.startTime = serverDay.startTime;
-          d.endTime = serverDay.endTime;
-          d.giveBreak = serverDay.giveBreak;
+          d.working    = serverDay.working;
+          d.startTime  = serverDay.startTime;
+          d.endTime    = serverDay.endTime;
+          d.giveBreak  = serverDay.giveBreak;
           d.breakStart = serverDay.breakStart;
-          d.breakEnd = serverDay.breakEnd;
-          d.chairs = serverDay.chairs ?? 1;
+          d.breakEnd   = serverDay.breakEnd;
+          d.chairs     = serverDay.chairs ?? 1;
         }
+
+        // 👇 Si hay al menos un día que atiende, ya existe horario
+        this.hasExistingSchedule = this.days.some(day => day.working);
+      } else {
+        this.hasExistingSchedule = false;
       }
     } catch (err: any) {
       console.error('DoctorSchedulePage: error cargando horarios', err);
@@ -296,14 +359,57 @@ export class DoctorSchedulePage implements OnInit {
     }
   }
 
+  /** Cuando tildan / destildan "Atiende" */
   onWorkingChange(d: DoctorDayScheduleVm) {
     if (!d.working) {
-      d.startTime = null;
-      d.endTime = null;
-      d.giveBreak = false;
+      d.startTime  = null;
+      d.endTime    = null;
+      d.giveBreak  = false;
       d.breakStart = null;
-      d.breakEnd = null;
-      d.chairs = 1;
+      d.breakEnd   = null;
+      d.chairs     = 1;
+      return;
+    }
+
+    // Si acaba de activar el día y no tenía horas, proponemos una franja por defecto
+    if (!d.startTime && !d.endTime) {
+      d.startTime = this.defaultStart;
+      d.endTime   = this.defaultEnd;
+      d.chairs    = 1;
+    }
+  }
+
+  /** Cuando tildan / destildan "Con descanso" */
+  onBreakToggle(d: DoctorDayScheduleVm) {
+    if (!d.giveBreak) {
+      d.breakStart = null;
+      d.breakEnd   = null;
+      return;
+    }
+
+    // Solo proponemos descanso si no tenía nada
+    if (!d.breakStart && !d.breakEnd) {
+      d.breakStart = this.defaultBreakStart;
+      d.breakEnd   = this.defaultBreakEnd;
+    }
+  }
+
+  /** Copia el horario de lunes a martes–viernes */
+  copyMondayToWeekdays() {
+    const monday = this.days[0];
+    if (!monday.working) {
+      return;
+    }
+
+    for (let i = 1; i <= 4; i++) {
+      const d = this.days[i];
+      d.working    = monday.working;
+      d.startTime  = monday.startTime;
+      d.endTime    = monday.endTime;
+      d.giveBreak  = monday.giveBreak;
+      d.breakStart = monday.breakStart;
+      d.breakEnd   = monday.breakEnd;
+      d.chairs     = monday.chairs;
     }
   }
 
@@ -331,13 +437,16 @@ export class DoctorSchedulePage implements OnInit {
 
       this.successMessage = 'Horarios guardados correctamente.';
 
-      // ⬇️ Aquí hacemos la redirección según rol
+      // Redirección según rol
       setTimeout(() => {
         const destino = this.isClinicAdmin
-          ? '/mi-clinica/dashboard'   // dueño de la clínica: ver lista de doctores/personal
-          : '/dashboard';             // dentista normal: su panel
+          ? '/mi-clinica'
+          : '/dashboard';
         this.router.navigateByUrl(destino);
       }, 900);
+
+      // a partir de ahora ya tiene horario configurado
+      this.hasExistingSchedule = this.days.some(d => d.working);
 
     } catch (err: any) {
       console.error('DoctorSchedulePage: error guardando horarios', err);
@@ -350,7 +459,7 @@ export class DoctorSchedulePage implements OnInit {
   }
 
   volverDespuesDeConfigurar() {
-    const destino = this.isClinicAdmin ? '/mi-clinica/dashboard' : '/dashboard';
+    const destino = this.isClinicAdmin ? '/mi-clinica' : '/dashboard';
     this.router.navigateByUrl(destino);
   }
 }

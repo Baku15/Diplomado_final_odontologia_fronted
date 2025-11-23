@@ -1,11 +1,9 @@
-// src/app/app.routes.ts
-
 import { Routes } from '@angular/router';
 import { HomePage } from './pages/home.page';
 import { PublicRegistrationPage } from './features/registration/public-registration.page';
 import { AuthGuard } from './core/guards/auth.guard';
 import { AdminRoleGuard } from './features/admin/solicitudes/admin-role.guard';
-import {ClinicAdminGuard} from './core/guards/clinic-admin.guard';
+import { ClinicAdminGuard } from './core/guards/clinic-admin.guard';
 
 export const routes: Routes = [
   // Página pública inicial
@@ -74,33 +72,80 @@ export const routes: Routes = [
           ),
       },
 
-      // aquí luego vendrán:
-      // /mi-clinica/doctores
+      // /mi-clinica/perfil-profesional → edición de perfil pero desde modo admin
+      {
+        path: 'perfil-profesional',
+        loadComponent: () =>
+          import('./features/dentist/doctor-profile-edit.page').then(
+            (m) => m.DoctorProfileEditPage,
+          ),
+      },
+
+      // /mi-clinica/consultorios → gestión de consultorios de la clínica
+      {
+        path: 'consultorios',
+        loadComponent: () =>
+          import('./features/clinic/clinic-rooms.page').then(
+            (m) => m.ClinicRoomsPage,
+          ),
+      },
+
+      // Gestión de doctores + invitaciones
+      {
+        path: 'doctores',
+        loadComponent: () =>
+          import('./features/clinic/clinic-doctors.page').then(
+            (m) => m.ClinicDoctorsPage,
+          ),
+      },
       // /mi-clinica/pacientes
       // /mi-clinica/ayudantes
     ],
   },
 
   // ============================
-  // DASHBOARD DENTISTA (ROLE_DENTIST)
+  // MODO ODONTÓLOGO (ROLE_DENTIST)
   // ============================
   {
     path: 'dashboard',
     canActivate: [AuthGuard],
     loadComponent: () =>
-      import('./features/dentist/dentist-dashboard.page').then(
-        (m) => m.DentistDashboardPage,
+      import('./layout/dentist-shell.layout').then(
+        (m) => m.DentistShellLayout,
       ),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/dentist/dentist-dashboard.page').then(
+            (m) => m.DentistDashboardPage,
+          ),
+      },
+      {
+        path: 'horarios',
+        loadComponent: () =>
+          import('./features/clinic/doctor-schedule.page').then(
+            (m) => m.DoctorSchedulePage,
+          ),
+      },
+      {
+        path: 'perfil-profesional', // 👈 ahora coincide con el routerLink
+        loadComponent: () =>
+          import('./features/dentist/doctor-profile-edit.page').then(
+            (m) => m.DoctorProfileEditPage,
+          ),
+      },
+    ],
   },
 
   // Completar perfil profesional (cuando falta wizard)
   {
     path: 'completar-perfil',
+    canActivate: [AuthGuard],
     loadComponent: () =>
       import('./features/clinic/doctor-complete-profile.page').then(
         (m) => m.DoctorCompleteProfilePage,
       ),
-    canActivate: [AuthGuard],
   },
 
   // Activación por link de correo
@@ -109,6 +154,34 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/activation/activation.page').then(
         (m) => m.ActivationPage,
+      ),
+  },
+
+  // Invitación pública para doctores
+  {
+    path: 'invitacion-doctor/:token',
+    loadComponent: () =>
+      import('./features/activation/doctor-invitation-landing.page').then(
+        (m) => m.DoctorInvitationLandingPage,
+      ),
+  },
+
+  // Registro de doctor invitado (flujo desde invitación)
+  {
+    path: 'registro-doctor/:token',
+    loadComponent: () =>
+      import('./features/activation/doctor-invitation-register.page').then(
+        (m) => m.DoctorInvitationRegisterPage,
+      ),
+  },
+
+  // Seguridad de la cuenta (cambiar contraseña)
+  {
+    path: 'mi-cuenta/seguridad',
+    canActivate: [AuthGuard],
+    loadComponent: () =>
+      import('./features/account/change-password.page').then(
+        (m) => m.ChangePasswordPage,
       ),
   },
 
