@@ -15,34 +15,46 @@ export class ClinicAdminGuard implements CanActivate {
   ) {}
 
   async canActivate(): Promise<boolean> {
-    // 🟡 Igual: en SSR no llamamos al backend con URL relativa
+    // SSR: no podemos llamar al backend con rutas relativas; dejamos pasar.
     if (!isPlatformBrowser(this.platformId)) {
-      console.log('ClinicAdminGuard (SSR): saltando comprobación de /api/me');
+      console.log('ClinicAdminGuard (SSR): saltando comprobación /api/me');
       return true;
     }
 
     try {
+      // Llamada a /api/me para obtener roles y clinicId
       const me: any = await firstValueFrom(
         this.http.get('/api/me', { withCredentials: true })
       );
-      const roles: string[] = me?.roles ?? [];
 
-      console.log('ClinicAdminGuard: /api/me =', me);
+      console.log('ClinicAdminGuard: /api/me ->', me);
 
-      const isClinicAdmin = roles.includes('ROLE_CLINIC_ADMIN');
+      const rawRoles: any = me?.roles ?? me?.role ?? [];
+      const roles: string[] = Array.isArray(rawRoles)
+        ? rawRoles.map((r: any) => String(r))
+        : [String(rawRoles)].filter(Boolean);
 
-      if (!isClinicAdmin) {
-        console.warn(
-          'ClinicAdminGuard: usuario sin ROLE_CLINIC_ADMIN, redirigiendo a /'
-        );
-        this.router.navigateByUrl('/');
+      // Normalizar sin prefijos, mayúsculas
+      const normalized = roles.map(r => r.replace(/^ROLE_/, '').toUpperCase());
+
+      // Roles permitidos: CLINIC_ADMIN o DENTIST o SUPERUSER
+      const allowed = normalized.some(r =>
+        ['CLINIC_ADMIN', 'DENTIST', 'SUPERUSER'].includes(r)
+      );
+
+      if (!allowed) {
+        console.warn('ClinicAdminGuard: acceso denegado. Roles del usuario:', normalized);
+        // Redirigir a home o dashboard (elige lo que mejor convenga)
+        await this.router.navigateByUrl('/');
         return false;
       }
 
+      // todo ok
       return true;
     } catch (err) {
       console.error('ClinicAdminGuard: error consultando /api/me', err);
-      this.router.navigateByUrl('/');
+      // si falla la consulta, redirigimos a home
+      try { await this.router.navigateByUrl('/'); } catch {}
       return false;
     }
   }

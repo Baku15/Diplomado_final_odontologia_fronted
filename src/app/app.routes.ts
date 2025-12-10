@@ -129,12 +129,38 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'perfil-profesional', // 👈 ahora coincide con el routerLink
+        path: 'perfil-profesional',
         loadComponent: () =>
           import('./features/dentist/doctor-profile-edit.page').then(
             (m) => m.DoctorProfileEditPage,
           ),
       },
+
+      // ---------- RUTAS DE PACIENTES (odontólogo) ----------
+      {
+        path: 'pacientes',
+        loadComponent: () =>
+          import('./features/clinic/patients/patient-list.page').then(
+            (m) => m.PatientListPage,
+          ),
+      },
+      {
+        path: 'pacientes/nuevo',
+        loadComponent: () =>
+          import('./features/clinic/patients/patient-create-wizard.page').then(
+            (m) => m.PatientCreateWizardPage,
+          ),
+      },
+
+
+      {
+        path: 'pacientes/:id',
+        loadComponent: () =>
+          import('./features/clinic/patients/patient-detail.page').then(
+            (m) => m.PatientDetailPage,
+          ),
+      },
+      // ----------------------------------------------------
     ],
   },
 

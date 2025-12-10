@@ -1,7 +1,8 @@
 // src/app/core/services/current-user.service.ts
 import { inject, Injectable } from '@angular/core';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class CurrentUserService {
@@ -65,5 +66,44 @@ export class CurrentUserService {
     if (u == null) return null;
     const n = typeof u === 'string' ? Number(u) : u;
     return Number.isFinite(n) ? n : null;
+  }
+
+  /**
+   * Synchronous helper used by components that need an immediate clinicId.
+   * It tries multiple fallbacks:
+   *  - OidcSecurityService.getUserData() (if available synchronously)
+   *  - current cached userData accessible via internal properties (best-effort)
+   * If nothing is available, returns null.
+   */
+  getClinicIdSync(): number | null {
+    try {
+      // Prefer public synchronous getter if present (some versions expose it)
+      const maybeGetUserData = (this.oidc as any).getUserData;
+      const ud = typeof maybeGetUserData === 'function' ? maybeGetUserData.call(this.oidc) : (this.oidc as any).getUserData?.() ?? null;
+
+      // fallback: try to read a cached snapshot from the service (implementation-specific)
+      const fallback = (this.oidc as any).userData ?? (this.oidc as any)._userData ?? null;
+
+      const data: any = ud ?? fallback ?? null;
+      const clinic = data?.clinic_id ?? data?.clinicId ?? null;
+      if (clinic == null) return null;
+      const n = typeof clinic === 'string' ? Number(clinic) : clinic;
+      return Number.isFinite(n) ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Observable helper (reactive) that emits clinicId when userData changes.
+   */
+  getClinicId$(): Observable<number | null> {
+    return this.oidc.userData$.pipe(
+      map((ud: any) => {
+        const clinic = ud?.clinic_id ?? ud?.clinicId ?? null;
+        const n = clinic == null ? null : (typeof clinic === 'string' ? Number(clinic) : clinic);
+        return Number.isFinite(n) ? n : null;
+      })
+    );
   }
 }
