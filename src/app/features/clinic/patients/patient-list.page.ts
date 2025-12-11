@@ -91,8 +91,7 @@ import { PatientService } from './patient.service';
       <div *ngIf="!loading && !error" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
           *ngFor="let p of paginated"
-          class="group bg-white p-6 rounded-xl shadow hover:shadow-xl transition cursor-pointer border border-slate-200 hover:border-emerald-400"
-          [routerLink]="['/dashboard/pacientes', p.id]">
+          class="group bg-white p-6 rounded-xl shadow hover:shadow-xl transition border border-slate-200 hover:border-emerald-400">
 
           <div class="flex items-start justify-between">
             <div class="flex-1">
@@ -141,9 +140,20 @@ import { PatientService } from './patient.service';
             </div>
           </div>
 
-          <button class="mt-5 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm shadow transition">
-            Ver / Editar
-          </button>
+          <!-- Botones de acción -->
+          <div class="mt-5 flex flex-col sm:flex-row gap-2">
+            <a
+              [routerLink]="['/dashboard/pacientes', p.id]"
+              class="flex-1 text-center bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm shadow transition">
+              Ver / Editar
+            </a>
+
+            <a
+              [routerLink]="['/dashboard/pacientes', p.id, 'historia-clinica']"
+              class="flex-1 text-center bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg text-sm shadow transition">
+              Historia clínica
+            </a>
+          </div>
         </div>
       </div>
 

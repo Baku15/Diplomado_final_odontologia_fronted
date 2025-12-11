@@ -98,8 +98,7 @@ export const routes: Routes = [
             (m) => m.ClinicDoctorsPage,
           ),
       },
-      // /mi-clinica/pacientes
-      // /mi-clinica/ayudantes
+      // aquí después puedes agregar /mi-clinica/pacientes, /mi-clinica/ayudantes si los necesitas en modo admin
     ],
   },
 
@@ -151,8 +150,6 @@ export const routes: Routes = [
             (m) => m.PatientCreateWizardPage,
           ),
       },
-
-
       {
         path: 'pacientes/:id',
         loadComponent: () =>
@@ -160,6 +157,16 @@ export const routes: Routes = [
             (m) => m.PatientDetailPage,
           ),
       },
+
+      // 🆕 Historia clínica del paciente
+      {
+        path: 'pacientes/:id/historia-clinica',
+        loadComponent: () =>
+          import('./features/clinic/patients/clinical-record.page').then(
+            (m) => m.ClinicalRecordPage,
+          ),
+      },
+
       // ----------------------------------------------------
     ],
   },

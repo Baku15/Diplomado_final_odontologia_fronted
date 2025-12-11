@@ -3,6 +3,7 @@ import { CommonModule, NgIf } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { PatientService } from './patient.service';
+import { ClinicalRecordService } from './clinical-record.service';
 import { PatientDetail } from './patient.model';
 
 @Component({
@@ -12,17 +13,57 @@ import { PatientDetail } from './patient.model';
   template: `
     <div class="max-w-4xl mx-auto px-4 py-6">
       <div class="mb-4 flex items-center justify-between">
+        <!-- Izquierda: volver al listado -->
         <button
           class="text-sm text-slate-600 hover:text-slate-800 inline-flex items-center gap-1"
           [routerLink]="['/dashboard/pacientes']">
           ⬅ Volver al listado
         </button>
 
-        <span *ngIf="patientId"
-              class="text-xs bg-slate-100 px-2 py-1 rounded border text-slate-500">
-          ID {{ patientId }}
-        </span>
+        <!-- Derecha: ID + PASTILLA Historia clínica -->
+        <div *ngIf="patientId" class="flex items-center gap-3">
+          <span class="text-xs bg-slate-100 px-2 py-1 rounded border text-slate-500">ID {{ patientId }}</span>
+
+          <!-- Clinical record badge / actions -->
+          <ng-container *ngIf="loadingClinicalRecord; else crLoaded">
+            <div class="text-xs px-3 py-2 rounded-lg bg-slate-100 text-slate-600 border">Cargando historia clínica…</div>
+          </ng-container>
+
+          <ng-template #crLoaded>
+            <div *ngIf="hasClinicalRecord; else noRecord" class="flex items-center gap-2">
+              <span
+                class="text-xs px-3 py-1 rounded-full text-xs font-medium"
+                [ngClass]="{
+                  'bg-emerald-50 text-emerald-700 border border-emerald-200': clinicalRecordStatus === 'ACTIVE',
+                  'bg-slate-100 text-slate-700 border border-slate-200': clinicalRecordStatus !== 'ACTIVE'
+                }"
+              >
+                Historia clínica — {{ clinicalRecordStatus }}
+              </span>
+
+              <button
+                (click)="goToClinicalRecord()"
+                class="text-xs px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Ver / Editar historia clínica
+              </button>
+            </div>
+
+            <ng-template #noRecord>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Sin historia clínica</span>
+                <button
+                  (click)="goToClinicalRecord()"
+                  class="text-xs px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  Crear historia clínica
+                </button>
+              </div>
+            </ng-template>
+          </ng-template>
+        </div>
       </div>
+
 
       <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
 
@@ -291,6 +332,7 @@ export class PatientDetailPage implements OnInit {
   private router = inject(Router);
   private fb = inject(FormBuilder);
   private patientService = inject(PatientService);
+  private clinicalRecordService = inject(ClinicalRecordService);
 
   patientId: number | null = null;
   loading = true;
@@ -319,6 +361,13 @@ export class PatientDetailPage implements OnInit {
 
   // display del teléfono (solo 8 dígitos)
   phoneMobileDisplay = '';
+
+  // Clinical record meta
+  hasClinicalRecord = false;
+  clinicalRecordStatus: string | null = null;
+  clinicalRecordCreatedAt: string | null = null;
+  clinicalRecordUpdatedAt: string | null = null;
+  loadingClinicalRecord = false;
 
   form = this.fb.group({
     givenName: ['', [Validators.required, Validators.minLength(2)]],
@@ -406,6 +455,9 @@ export class PatientDetailPage implements OnInit {
       } else {
         this.phoneMobileDisplay = '';
       }
+
+      // carga meta de historia clínica (no bloqueante)
+      this.loadClinicalRecordMeta().catch(err => console.warn('CR meta load failed', err));
     } catch (err: any) {
       console.error('Error cargando paciente', err);
       this.error = err?.error?.message || err?.message || 'No se pudo cargar el paciente.';
@@ -536,5 +588,48 @@ export class PatientDetailPage implements OnInit {
 
   goBack() {
     this.router.navigateByUrl('/dashboard/pacientes');
+  }
+
+  // ===== Clinical record helpers =====
+  private async loadClinicalRecordMeta(): Promise<void> {
+    if (!this.patientId) return;
+    this.loadingClinicalRecord = true;
+    this.hasClinicalRecord = false;
+    this.clinicalRecordStatus = null;
+    this.clinicalRecordCreatedAt = null;
+    this.clinicalRecordUpdatedAt = null;
+
+    try {
+      const cr = await this.clinicalRecordService.getByPatient(this.patientId);
+      if (cr) {
+        this.hasClinicalRecord = true;
+        this.clinicalRecordStatus = (cr as any).status || 'ACTIVE';
+        this.clinicalRecordCreatedAt = (cr as any).createdAt || null;
+        this.clinicalRecordUpdatedAt = (cr as any).updatedAt || null;
+      } else {
+        this.hasClinicalRecord = false;
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.message || String(err);
+      if (String(msg).toLowerCase().includes('no tiene historia cl') || err?.status === 404) {
+        this.hasClinicalRecord = false;
+      } else {
+        console.warn('loadClinicalRecordMeta error', err);
+      }
+    } finally {
+      this.loadingClinicalRecord = false;
+    }
+  }
+
+  goToClinicalRecord() {
+    if (!this.patientId) return;
+    this.router.navigate(['/dashboard/pacientes', this.patientId, 'historia-clinica']);
+  }
+
+  formatDate(value?: string | Date | null) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleString();
   }
 }
