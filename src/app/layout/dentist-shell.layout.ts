@@ -143,6 +143,33 @@ import { AuthService } from '../core/services/auth.service';
               <span class="truncate" *ngIf="!sidebarCollapsed">Pacientes</span>
             </a>
 
+            <!-- Citas -->
+            <a
+              routerLink="/dashboard/citas"
+              routerLinkActive="bg-white/10 text-white shadow-sm"
+              class="flex items-center gap-3 px-3 py-2 text-xs font-medium
+         rounded-xl hover:bg-white/10 hover:text-white transition-colors
+         border border-transparent"
+            >
+  <span class="inline-flex">
+    <svg xmlns="http://www.w3.org/2000/svg"
+         class="h-5 w-5"
+         viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  </span>
+
+              <span class="truncate">
+    Citas
+  </span>
+            </a>
+
+
             <a
               routerLink="/dashboard/pacientes/nuevo"
               routerLinkActive="bg-white/10 text-white"

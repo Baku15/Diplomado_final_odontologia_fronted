@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-import { NavbarComponent } from '../../shared/navbar/navbar.component';
+import { NavbarComponent } from '../../../shared/navbar/navbar.component';
 import { DoctorProfileWizard } from './doctor-profile-wizard.component';
 
 interface MeResponse {

@@ -2,9 +2,9 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { lastValueFrom, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { PatientCreateRequest } from './patient.model';
-import { CurrentUserService } from '../../../core/services/current-user.service';
-import { environment } from '../../../../environments/environment';
+import { PatientCreateRequest } from '../models/patient.model';
+import { CurrentUserService } from './current-user.service';
+import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class PatientService {
@@ -126,12 +126,21 @@ export class PatientService {
    * Lista de pacientes.
    * Puede devolver un array simple o una respuesta paginada según backend.
    */
-  async listPatients(): Promise<any> {
+  async listPatients(page = 0, size = 1000): Promise<any> {
     const clinicId = await this.resolveClinicId();
     if (!clinicId) throw new Error('No clinicId found (token or /api/me).');
+
     const url = `${this.apiBase}/api/clinic/${clinicId}/patients`;
-    return lastValueFrom(this.http.get<any>(url));
+    return lastValueFrom(
+      this.http.get<any>(url, {
+        params: {
+          page: String(page),
+          size: String(size),
+        },
+      })
+    );
   }
+
 
   /**
    * Obtener detalle de un paciente por ID.

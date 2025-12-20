@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { ClinicStaffApi, StaffView } from './clinic-staff.api';
 import { CreateStaffModalComponent } from './create-staff-modal.component';
 import { EditStaffModalComponent } from './edit-staff-modal.component';
-import { AuthService } from '../../core/services/auth.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   standalone: true,

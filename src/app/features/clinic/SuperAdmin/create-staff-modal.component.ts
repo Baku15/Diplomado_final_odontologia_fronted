@@ -3,7 +3,7 @@ import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ClinicStaffApi } from './clinic-staff.api';
-import { AuthService } from '../../core/services/auth.service'; // ajustar path si necesario
+import { AuthService } from '../../../core/services/auth.service'; // ajustar path si necesario
 import { firstValueFrom } from 'rxjs';
 
 @Component({

@@ -1,19 +1,27 @@
 // src/app/features/clinic/patients/clinical-record.page.ts
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, NgIf, NgFor } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   FormBuilder,
   ReactiveFormsModule,
   Validators,
+  FormsModule,
+
 } from '@angular/forms';
-import { ClinicalRecordService } from './clinical-record.service';
-import { ClinicalRecordDetail } from './clinical-record.model';
+import { ClinicalRecordService } from '../../../../core/services/clinical-record.service';
+import { ClinicalRecordDetail, AttachmentDto } from '../../../../core/models/clinical-record.model';
+
+// IMPORTANT: ajusta las rutas de import si tus servicios están en otra carpeta
+import { PatientService } from '../../../../core/services/patient.service';
+import { OdontogramService } from '../../../../core/services/odontogram.service';
+import { AttachmentService } from '../../../../core/services/attachment.service';
+import {ClinicalRecordAttachmentsModal} from './clinical-record-attachments.modal';
 
 @Component({
   standalone: true,
   selector: 'app-clinical-record',
-  imports: [CommonModule, ReactiveFormsModule, NgIf, NgFor, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, NgIf, NgFor, RouterLink, ClinicalRecordAttachmentsModal],
   template: `
     <div class="max-w-5xl mx-auto px-4 py-6">
       <div class="mb-4 flex items-center justify-between">
@@ -631,6 +639,7 @@ import { ClinicalRecordDetail } from './clinical-record.model';
             </div>
           </section>
 
+
           <!-- Acciones -->
           <div class="pt-4 flex items-center justify-between">
             <p class="text-xs text-slate-500">
@@ -638,14 +647,6 @@ import { ClinicalRecordDetail } from './clinical-record.model';
             </p>
 
             <div class="flex gap-3">
-              <button
-                type="button"
-                (click)="onCancel()"
-                class="px-3 py-2 rounded-lg border text-sm"
-              >
-                Cancelar
-              </button>
-
 
 
               <button
@@ -661,7 +662,28 @@ import { ClinicalRecordDetail } from './clinical-record.model';
       </div>
     </div>
 
-    <!-- Modal guardar -->
+    <!-- Preview modal: mostrar solo si estamos previewing y existe attachment -->
+    <div *ngIf="previewing && previewAttachment" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-black/50" (click)="closePreview()"></div>
+      <div class="bg-white rounded-lg shadow-lg max-w-4xl w-full overflow-hidden z-10">
+        <div class="px-4 py-3 border-b flex items-center justify-between">
+          <div class="text-sm font-semibold">{{ previewAttachment.filename }}</div>
+          <div class="flex items-center gap-2">
+            <a *ngIf="previewAttachment?.downloadUrl" [href]="previewAttachment.downloadUrl" target="_blank" class="text-xs px-3 py-1 rounded border">Abrir en nueva pestaña</a>
+            <button (click)="closePreview()" class="text-xs px-3 py-1 rounded border">Cerrar</button>
+          </div>
+        </div>
+
+        <!-- body (ejemplo imagen) -->
+        <div class="p-4">
+          <img *ngIf="previewAttachment?.downloadUrl" [src]="previewAttachment.downloadUrl" class="w-full h-auto object-contain" />
+          <p *ngIf="previewAttachment.notes" class="mt-3 text-sm text-slate-600">{{ previewAttachment.notes }}</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Modal guardar (confirmación previa a guardar) -->
     <div *ngIf="showSaveModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" (click)="closeSaveModal()"></div>
       <div class="bg-white rounded-xl shadow-lg max-w-lg w-full p-6 z-10">
@@ -669,7 +691,7 @@ import { ClinicalRecordDetail } from './clinical-record.model';
         <p class="text-sm text-slate-600 mb-4">¿Deseas guardar los cambios en la historia clínica?</p>
         <div class="flex justify-end gap-3">
           <button class="px-4 py-2 rounded-lg border" (click)="closeSaveModal()">Cancelar</button>
-          <button class="px-4 py-2 rounded-lg bg-emerald-600 text-white" (click)="performSave()">Sí, guardar y volver a la lista</button>
+          <button class="px-4 py-2 rounded-lg bg-emerald-600 text-white" (click)="performSave()">Sí, guardar</button>
         </div>
       </div>
     </div>
@@ -689,14 +711,33 @@ import { ClinicalRecordDetail } from './clinical-record.model';
         </div>
       </div>
     </div>
+    <!-- Modal adjuntar imágenes a historia clínica -->
+    <app-clinical-record-attachments-modal
+      *ngIf="showAttachImagesModal"
+      [patientId]="patientId!"
+      [clinicalRecordId]="recordId!"
+      (close)="onSkipAttachments()"
+      (saved)="onAttachmentsSaved()">
+    </app-clinical-record-attachments-modal>
+
   `,
 })
 export class ClinicalRecordPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private fb = inject(FormBuilder);
+  showAttachImagesModal = false;
+
   private clinicalRecordService = inject(ClinicalRecordService);
 
+  // servicios nuevos inyectados (ajusta rutas si es necesario)
+  private patientService = inject(PatientService);
+  private odontogramService = inject(OdontogramService);
+  private attachmentService = inject(AttachmentService);
+
+  @ViewChild('fileInputRef', { static: false }) fileInputRef?: ElementRef<HTMLInputElement>;
+
+  clinicId!: number;
   patientId: number | null = null;
   recordId: number | null = null;
 
@@ -712,7 +753,28 @@ export class ClinicalRecordPage implements OnInit {
   showSaveModal = false;
   showCloseModal = false;
 
-  // ===== SUGERENCIAS (puedes agregar / modificar) =====
+  // attachments state
+  attachments: AttachmentDto[] = [];
+  attachmentsPage = 0;
+  attachmentsSize = 50;
+
+  // preview
+  previewing = false;
+  previewAttachment: AttachmentDto | null = null;
+
+  // upload state
+  uploading = false;
+  uploadFile: File | null = null;
+  uploadNotes: string | null = '';
+  uploadToothRef: string | null = '';
+  uploadType: string | null = '';
+  uploadProgressVisible = false;
+  uploadProgressText = '';
+
+  // permissions (client-side hint; backend enforces)
+  canDelete = true; // o derivar desde CurrentUserService si lo deseas
+
+  // ===== SUGERENCIAS (completas) =====
   chiefComplaintSuggestions: string[] = [
     'Dolor dental agudo en pieza específica',
     'Molestia al masticar',
@@ -833,11 +895,8 @@ export class ClinicalRecordPage implements OnInit {
   cariesRiskOptions: string[] = ['Bajo', 'Moderado', 'Alto'];
 
   form = this.fb.group({
-    // clave
     chiefComplaint: ['', [Validators.required, Validators.minLength(4)]],
     currentIllness: [''],
-
-    // antecedentes (texto plano en el form)
     medicalHistory: [''],
     dentalHistory: [''],
     allergies: [''],
@@ -845,20 +904,14 @@ export class ClinicalRecordPage implements OnInit {
     systemicConditions: [''],
     pregnancyStatus: [''],
     riskBehaviors: [''],
-
-    // examen
     extraoralExam: [''],
     intraoralExam: [''],
     periodontalStatus: [''],
     cariesRisk: [''],
     occlusionNotes: [''],
-
-    // diagnóstico
     initialDiagnosticSummary: [''],
     initialTreatmentPlanSummary: [''],
     initialPrognosis: [''],
-
-    // signos vitales (flatten en el form)
     bloodPressureSystolic: [null as number | null, [Validators.min(0), Validators.max(300)]],
     bloodPressureDiastolic: [null as number | null, [Validators.min(0), Validators.max(200)]],
     heartRate: [null as number | null, [Validators.min(0), Validators.max(250)]],
@@ -872,14 +925,35 @@ export class ClinicalRecordPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.patientId = Number(this.route.snapshot.paramMap.get('id'));
+
     if (!this.patientId) {
       this.error = 'ID de paciente inválido.';
       this.loading = false;
       return;
     }
 
+    // 🔑 CLAVE: resolver clinicId desde el contexto del usuario
+    const clinicId = await this.patientService.getClinicIdForRoutes();
+
+    if (!clinicId) {
+      this.error = 'No se pudo determinar la clínica activa.';
+      this.loading = false;
+      return;
+    }
+
+    this.clinicId = clinicId;
+
+    if (!this.clinicId) {
+      this.error = 'No se pudo determinar la clínica activa.';
+      this.loading = false;
+      return;
+    }
+
     try {
-      const existing = await this.clinicalRecordService.getByPatient(this.patientId);
+      const existing = await this.clinicalRecordService.getByPatient(
+        this.patientId
+      );
+
       if (existing) {
         this.recordId = existing.id ?? null;
         this.patchForm(existing);
@@ -888,16 +962,22 @@ export class ClinicalRecordPage implements OnInit {
       } else {
         this.recordId = null;
       }
+
+      await this.loadAttachments();
+
     } catch (err: any) {
       console.error('Error cargando historia clínica', err);
-      this.error = err?.error?.message || err?.message || 'No se pudo cargar la historia clínica.';
+      this.error =
+        err?.error?.message ||
+        err?.message ||
+        'No se pudo cargar la historia clínica.';
     } finally {
       this.loading = false;
     }
   }
 
+
   patchForm(cr: ClinicalRecordDetail) {
-    // Vitales que vienen del backend
     const vs = cr.vitalSigns || {};
 
     const safeBpSystolic =
@@ -954,7 +1034,7 @@ export class ClinicalRecordPage implements OnInit {
       intraoralExam: (cr as any).intraoralExam?.summary || (cr as any).intraoralExam || '',
       periodontalStatus: cr.periodontalStatus || '',
       cariesRisk: cr.cariesRisk || '',
-      occlusionNotes: cr.occlusionNotes || '',
+      occlusionNotes: cr.intraoralExam?.occlusionNotes || '',
       initialDiagnosticSummary: cr.initialDiagnosticSummary || '',
       initialTreatmentPlanSummary: cr.initialTreatmentPlanSummary || '',
       initialPrognosis: cr.initialPrognosis || '',
@@ -985,10 +1065,6 @@ export class ClinicalRecordPage implements OnInit {
     this.form.get('bmi')?.setValue(null);
   }
 
-  /**
-   * Añade texto a un textarea sin sobrescribir lo anterior.
-   * Evita duplicados exactos.
-   */
   appendToTextarea(controlName: string, text: string) {
     const control = this.form.get(controlName);
     if (!control) return;
@@ -1005,9 +1081,6 @@ export class ClinicalRecordPage implements OnInit {
     control.markAsDirty();
   }
 
-  /**
-   * Setea un control simple con un valor sugerido.
-   */
   setControlValue(controlName: string, value: string) {
     const control = this.form.get(controlName);
     if (!control) return;
@@ -1034,35 +1107,272 @@ export class ClinicalRecordPage implements OnInit {
     this.showCloseModal = false;
   }
 
-  // ===== Guardar (confirmado desde modal) =====
+  // ===== Attachments methods =====
+  async loadAttachments() {
+    if (!this.patientId) return;
+    try {
+      const page = await this.attachmentService.listGallery(this.patientId, this.attachmentsPage, this.attachmentsSize);
+      // page may be a Page<T> with content
+      if (Array.isArray(page)) {
+        this.attachments = page as AttachmentDto[];
+      } else if (page && Array.isArray((page as any).content)) {
+        this.attachments = (page as any).content;
+      } else if ((page as any).content) {
+        this.attachments = (page as any).content || [];
+      } else {
+        this.attachments = [];
+      }
+    } catch (err: any) {
+      console.error('Error loading attachments', err);
+      this.attachments = [];
+    }
+  }
+
+  refreshAttachments() {
+    this.loadAttachments();
+  }
+
+  /**
+   * Abre el file picker (botón en UI).
+   */
+  triggerFileInput() {
+    const el = this.fileInputRef?.nativeElement as HTMLInputElement | undefined;
+    if (el) {
+      try { el.click(); } catch (e) { console.warn('No se pudo abrir el selector de archivos', e); }
+    } else {
+      console.warn('fileInputRef no está inicializado aún');
+    }
+  }
+
+
+  /**
+   * Maneja el change del input file.
+   * Recibe el evento y extrae FileList de forma segura.
+   */
+  onFileSelected(event: Event) {
+    const input = event?.target as HTMLInputElement | null;
+    const files = input?.files ?? null;
+    if (!files || files.length === 0) {
+      this.uploadFile = null;
+      return;
+    }
+    this.uploadFile = files[0];
+    this.uploading = true;
+    this.uploadProgressVisible = false;
+    this.uploadProgressText = '';
+    console.debug('Archivo seleccionado para upload:', this.uploadFile.name, this.uploadFile.type, this.uploadFile.size);
+  }
+
+  cancelUpload() {
+    this.uploading = false;
+    this.uploadFile = null;
+    this.uploadNotes = '';
+    this.uploadToothRef = '';
+    this.uploadType = '';
+    this.uploadProgressVisible = false;
+    this.uploadProgressText = '';
+    // reset file input value so choosing same file again triggers change
+    try {
+      if (this.fileInputRef?.nativeElement) {
+        this.fileInputRef.nativeElement.value = '';
+      }
+    } catch (e) {}
+  }
+
+  async performUpload() {
+    if (!this.patientId) {
+      alert('ID de paciente inválido.');
+      return;
+    }
+    if (!this.uploadFile) {
+      alert('Selecciona un archivo antes de subir.');
+      return;
+    }
+
+
+
+    try {
+      this.uploadProgressVisible = true;
+      this.uploadProgressText = 'Solicitando URL de subida…';
+      console.debug('Requesting presign for file', this.uploadFile.name);
+
+      let presign: any = null;
+      try {
+        presign = await this.attachmentService.generatePresign(
+          this.patientId,
+          this.uploadFile.name,
+          this.uploadFile.type,
+          this.uploadFile.size,
+          this.recordId, null,
+          this.uploadToothRef || undefined,
+          this.uploadType || undefined,
+          this.uploadNotes || undefined
+        );
+        console.debug('Presign response:', presign);
+      } catch (errPresign) {
+        console.warn('Presign request failed, will try multipart fallback', errPresign);
+        presign = null;
+      }
+
+      if (presign && presign.presignedPutUrl && presign.objectKey) {
+        this.uploadProgressText = 'Subiendo archivo al storage…';
+        console.debug('Uploading to:', presign.presignedPutUrl);
+
+        try {
+          await this.attachmentService.uploadFileToPresignedUrl(
+            presign.presignedPutUrl,
+            this.uploadFile,
+            this.uploadFile.type
+          );
+          console.debug('Upload to presigned URL OK');
+        } catch (errUpload) {
+          console.warn('Upload to presigned URL failed -> fallback', errUpload);
+          presign = null;
+        }
+      }
+
+      let saved: any = null;
+
+      if (!presign) {
+        // Fallback: subir vía multipart directamente al backend
+        try {
+          this.uploadProgressText = 'Subiendo archivo vía multipart al backend…';
+          console.debug('Attempting multipart upload fallback');
+          saved = await this.attachmentService.uploadMultipart(
+            this.patientId,
+            this.uploadFile,
+            this.recordId,
+            this.uploadToothRef || undefined,
+            this.uploadType || undefined,
+            this.uploadNotes || undefined,
+            null
+          );
+          console.debug('Multipart upload saved:', saved);
+        } catch (errMultipart) {
+          console.error('Multipart upload also failed', errMultipart);
+          throw errMultipart;
+        }
+      } else {
+        // Confirmar link en DB cuando usamos presign
+        this.uploadProgressText = 'Confirmando en base de datos…';
+        const linkPayload = {
+          storageKey: presign.objectKey,
+          filename: this.uploadFile.name,
+          contentType: this.uploadFile.type,
+          sizeBytes: this.uploadFile.size,
+          clinicalRecordId: this.recordId,
+          toothReference: this.uploadToothRef || undefined,
+          notes: this.uploadNotes || undefined,
+          type: this.uploadType || undefined,
+        };
+        console.debug('Linking attachment with payload:', linkPayload);
+        saved = await this.attachmentService.linkAttachment(this.patientId, linkPayload);
+        console.debug('Attachment linked:', saved);
+      }
+
+      if (saved) {
+        this.attachments.unshift(saved);
+      }
+
+      this.cancelUpload();
+      await this.loadAttachments();
+      this.uploadProgressText = 'Subida completada.';
+
+    } catch (err: any) {
+      console.error('Upload error', err);
+      alert(err?.error?.message || err?.message || 'Error subiendo archivo.');
+      this.uploadProgressText = 'Error subiendo archivo.';
+    } finally {
+      this.uploadProgressVisible = false;
+    }
+  }
+
+
+
+  async openPreview(a: AttachmentDto) {
+    if (!this.patientId || !a || !a.id) return;
+    try {
+      const fresh = await this.attachmentService.getAttachment(this.patientId, a.id, 300);
+      this.previewAttachment = fresh;
+    } catch (err) {
+      this.previewAttachment = a;
+    }
+    this.previewing = true;
+  }
+
+  closePreview() {
+    this.previewing = false;
+    this.previewAttachment = null;
+  }
+
+  confirmDeleteAttachment(a: AttachmentDto) {
+    const ok = confirm(`¿Eliminar la imagen "${a.filename}"? Esta acción no se puede deshacer.`);
+    if (!ok) return;
+    this.deleteAttachment(a);
+  }
+
+  async deleteAttachment(a: AttachmentDto) {
+    if (!this.patientId) return;
+    try {
+      await this.attachmentService.deleteAttachment(this.patientId, a.id);
+      this.attachments = this.attachments.filter(x => x.id !== a.id);
+    } catch (err: any) {
+      console.error('Delete attachment error', err);
+      alert(err?.error?.message || err?.message || 'No se pudo borrar la imagen.');
+    }
+  }
+
   async performSave() {
     this.closeSaveModal();
     if (!this.patientId) return;
 
     this.saving = true;
     this.error = null;
+
     try {
       const formValue = this.form.value;
 
       const payload: ClinicalRecordDetail = {
         id: this.recordId,
+
+        // ===== Motivo =====
         chiefComplaint: formValue.chiefComplaint || null,
         currentIllness: formValue.currentIllness || null,
-        medicalHistory: (formValue.medicalHistory as any) || null,
-        dentalHistory: (formValue.dentalHistory as any) || null,
-        extraoralExam: (formValue.extraoralExam as any) || null,
-        intraoralExam: (formValue.intraoralExam as any) || null,
+
+        // ===== Antecedentes =====
+        medicalHistory: formValue.medicalHistory
+          ? { summary: formValue.medicalHistory }
+          : null,
+
+        dentalHistory: formValue.dentalHistory
+          ? { summary: formValue.dentalHistory }
+          : null,
+
         allergies: formValue.allergies || null,
         medications: formValue.medications || null,
         systemicConditions: formValue.systemicConditions || null,
         pregnancyStatus: formValue.pregnancyStatus || null,
         riskBehaviors: formValue.riskBehaviors || null,
+
+        // ===== Examen clínico =====
+        extraoralExam: formValue.extraoralExam
+          ? { summary: formValue.extraoralExam }
+          : null,
+
+        intraoralExam: {
+          occlusionNotes: formValue.occlusionNotes || null
+        },
+
+        // ===== SELECTS (nivel raíz) =====
         periodontalStatus: formValue.periodontalStatus || null,
         cariesRisk: formValue.cariesRisk || null,
-        occlusionNotes: formValue.occlusionNotes || null,
+
+        // ===== Diagnóstico =====
         initialDiagnosticSummary: formValue.initialDiagnosticSummary || null,
         initialTreatmentPlanSummary: formValue.initialTreatmentPlanSummary || null,
         initialPrognosis: formValue.initialPrognosis || null,
+
+        // ===== Signos vitales =====
         vitalSigns: {
           bloodPressureSystolic: formValue.bloodPressureSystolic ?? null,
           bloodPressureDiastolic: formValue.bloodPressureDiastolic ?? null,
@@ -1073,31 +1383,35 @@ export class ClinicalRecordPage implements OnInit {
           weightKg: formValue.weightKg ?? null,
           heightCm: formValue.heightCm ?? null,
           bmi: formValue.bmi ?? null,
-        },
+        }
       };
 
-      const saved = await this.clinicalRecordService.upsertForPatient(this.patientId, payload);
+      const saved = await this.clinicalRecordService.upsertForPatient(
+        this.patientId,
+        payload
+      );
+
       this.recordId = saved.id ?? this.recordId;
       this.createdAt = saved.createdAt || this.createdAt;
       this.updatedAt = saved.updatedAt || new Date().toISOString();
 
-      this.successMessage = this.recordId
-        ? 'Historia clínica actualizada correctamente.'
-        : 'Historia clínica creada correctamente.';
+      this.successMessage = 'Historia clínica guardada correctamente.';
+      this.showAttachImagesModal = true;
 
-      // Redirigir a la lista (pequeña pausa para mostrar mensaje)
-      setTimeout(() => {
-        this.router.navigateByUrl('/dashboard/pacientes');
-      }, 500);
+
+
     } catch (err: any) {
       console.error('Error guardando historia clínica', err);
-      this.error = err?.error?.message || err?.message || 'No se pudo guardar la historia clínica.';
+      this.error =
+        err?.error?.message ||
+        err?.message ||
+        'No se pudo guardar la historia clínica.';
     } finally {
       this.saving = false;
     }
   }
 
-  // ===== Cerrar historia (confirmado desde modal) =====
+
   async performClose() {
     this.closeCloseModal();
     if (!this.patientId) return;
@@ -1105,8 +1419,9 @@ export class ClinicalRecordPage implements OnInit {
     this.saving = true;
     this.error = null;
     try {
-      await this.clinicalRecordService.closeClinicalRecord(this.patientId);
-      this.successMessage = 'Historia clínica cerrada. Redirigiendo a la lista...';
+      await this.clinicalRecordService.closeClinicalRecord(
+        this.patientId
+      );      this.successMessage = 'Historia clínica cerrada. Redirigiendo a la lista...';
 
       setTimeout(() => {
         this.router.navigateByUrl('/dashboard/pacientes');
@@ -1119,16 +1434,80 @@ export class ClinicalRecordPage implements OnInit {
     }
   }
 
-  // Cancel -> ir a la lista principal
   onCancel() {
     this.router.navigateByUrl('/dashboard/pacientes');
   }
 
-  // Exportar FHIR
+  async goToOdontogram() {
+    if (!this.patientId) {
+      this.error = 'ID de paciente inválido para abrir odontograma.';
+      return;
+    }
+
+    try {
+      let clinicId: number | null = null;
+      try {
+        const maybe = (this.patientService as any).getClinicIdForRoutes?.();
+        clinicId = maybe instanceof Promise ? await maybe : maybe;
+      } catch {
+        clinicId = null;
+      }
+
+      // 🔹 Si no podemos resolver clinicId, navegamos igual
+      if (!clinicId) {
+        this.router.navigate(
+          ['/dashboard/pacientes', this.patientId, 'odontograma'],
+          { queryParams: this.recordId ? { clinicalRecordId: this.recordId } : {} }
+        );
+        return;
+      }
+
+      let chart: any = null;
+
+      // 🔹 Intentar crear odontograma si no existe
+      try {
+        chart = await (this.odontogramService as any).createChart?.(
+          clinicId,
+          this.patientId,
+          this.recordId
+        );
+        if (chart?.data) chart = chart.data;
+      } catch (err) {
+        console.warn('No se pudo crear odontograma, buscando activo…', err);
+        try {
+          chart = await (this.odontogramService as any).getActiveChart?.(
+            clinicId,
+            this.patientId
+          );
+          if (chart?.data) chart = chart.data;
+        } catch {
+          chart = null;
+        }
+      }
+
+      const query: any = {};
+      if (this.recordId) query.clinicalRecordId = this.recordId;
+      if (chart?.id) query.chartId = chart.id;
+
+      this.router.navigate(
+        ['/dashboard/pacientes', this.patientId, 'odontograma'],
+        { queryParams: query }
+      );
+
+    } catch (err: any) {
+      console.error('Error al abrir odontograma', err);
+      this.error =
+        err?.error?.message ||
+        err?.message ||
+        'No se pudo abrir el odontograma.';
+    }
+  }
   async onExportFhir() {
     if (!this.patientId) return;
     try {
-      const json = await this.clinicalRecordService.exportFhir(this.patientId);
+      const json = await this.clinicalRecordService.exportFhir(
+        this.patientId
+      );
       const blob = new Blob([json], { type: 'application/fhir+json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1142,4 +1521,22 @@ export class ClinicalRecordPage implements OnInit {
       this.error = err?.error?.message || err?.message || 'No se pudo exportar la historia clínica en FHIR.';
     }
   }
+
+  formatDate(value?: string | Date | null) {
+    if (!value) return '—';
+    const d = new Date(value as any);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleString();
+  }
+
+  onSkipAttachments() {
+    this.showAttachImagesModal = false;
+    this.goToOdontogram();
+  }
+
+  onAttachmentsSaved() {
+    this.showAttachImagesModal = false;
+    this.goToOdontogram();
+  }
+
 }

@@ -8,8 +8,8 @@ import {
 } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../../environments/environment';
-import { PatientService } from './patient.service';
+import { environment } from '../../../../../environments/environment';
+import { PatientService } from '../../../../core/services/patient.service';
 
 @Component({
   standalone: true,
@@ -561,21 +561,45 @@ export class PatientCreateWizardPage implements OnInit {
     }
 
     try {
+      let createdPatient: any;
+
       if (this.selectedPhoto) {
-        await this.patientService.createPatientWithPhoto(payload, this.selectedPhoto);
+        createdPatient = await this.patientService.createPatientWithPhoto(
+          payload,
+          this.selectedPhoto
+        );
       } else {
-        await this.patientService.createPatient(payload);
+        createdPatient = await this.patientService.createPatient(payload);
       }
 
-      await this.router.navigateByUrl('/dashboard/pacientes', {
-        state: { message: 'Paciente creado correctamente.' },
-      });
+      // 🔴 VALIDACIÓN DEFENSIVA
+      if (!createdPatient || !createdPatient.id) {
+        throw new Error('No se pudo obtener el ID del paciente creado');
+      }
+
+      // ✅ REDIRECCIÓN CORRECTA AL HISTORIAL CLÍNICO
+      const clinicId =
+        Number(localStorage.getItem('clinic_id')) ||
+        Number((createdPatient as any).clinicId);
+
+      if (!clinicId) {
+        throw new Error('No se pudo determinar la clínica activa para el paciente creado');
+      }
+
+      await this.router.navigate([
+        '/dashboard',
+        'pacientes',
+        createdPatient.id,
+        'historia-clinica'
+      ]);
+
 
     } catch (err: any) {
       console.error('Error creando paciente', err);
       alert(err?.error?.message || 'No se pudo crear el paciente.');
     }
   }
+
 
   // ERRORS ---------------------------------------------
 

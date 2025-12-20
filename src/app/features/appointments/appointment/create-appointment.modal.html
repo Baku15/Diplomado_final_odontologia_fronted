@@ -1,0 +1,71 @@
+<div class="modal-backdrop">
+  <div class="modal">
+
+    <h2>Crear cita</h2>
+
+    <div class="field">
+      <label>Fecha</label>
+      <input type="text" [value]="date" disabled>
+    </div>
+
+    <div class="field">
+      <label>Hora inicio</label>
+      <input type="text" [value]="startTime" disabled>
+    </div>
+
+    <div class="field">
+      <label>Duración</label>
+      <select [(ngModel)]="durationMinutes">
+        <option [value]="30">30 minutos</option>
+        <option [value]="45">45 minutos</option>
+        <option [value]="60">60 minutos</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Hora fin</label>
+      <input type="text" [value]="endTime" disabled>
+    </div>
+
+    <div class="field">
+      <label>Motivo</label>
+      <input type="text" [(ngModel)]="reason" placeholder="Ej: Continuar tratamiento">
+    </div>
+
+    <hr>
+
+    <h4>Recordatorios</h4>
+
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="sendEmail">
+      Enviar correo electrónico
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" [(ngModel)]="sendWhatsapp">
+      Enviar WhatsApp (futuro)
+    </label>
+
+    <div class="field">
+      <label>Recordar antes</label>
+      <select [(ngModel)]="reminderMinutesBefore">
+        <option [value]="1440">24 horas</option>
+        <option [value]="2880">48 horas</option>
+      </select>
+    </div>
+
+    <p class="warning">
+      ⚠️ Cancelaciones con menos de 24 horas pueden generar sanciones.
+    </p>
+
+    <div *ngIf="error" class="error">
+      {{ error }}
+    </div>
+
+    <div class="actions">
+      <button (click)="cancel()">Cancelar</button>
+      <button [disabled]="saving" (click)="save()">Guardar cita</button>
+    </div>
+
+  </div>
+</div>

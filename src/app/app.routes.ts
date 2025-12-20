@@ -2,8 +2,10 @@ import { Routes } from '@angular/router';
 import { HomePage } from './pages/home.page';
 import { PublicRegistrationPage } from './features/registration/public-registration.page';
 import { AuthGuard } from './core/guards/auth.guard';
-import { AdminRoleGuard } from './features/admin/solicitudes/admin-role.guard';
+import { AdminRoleGuard } from './core/guards/admin-role.guard';
 import { ClinicAdminGuard } from './core/guards/clinic-admin.guard';
+import {ClinicalRecordRequiredGuard} from './core/guards/clinical-record-required.guard';
+import {ActiveConsultationRequiredGuard} from './core/guards/active-consultation-required.guard';
 
 export const routes: Routes = [
   // Página pública inicial
@@ -58,7 +60,7 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./features/clinic/mi-clinica-dashboard.component').then(
+          import('./features/clinic/SuperAdmin/mi-clinica-dashboard.component').then(
             (m) => m.MiClinicaDashboardComponent,
           ),
       },
@@ -67,7 +69,7 @@ export const routes: Routes = [
       {
         path: 'horarios',
         loadComponent: () =>
-          import('./features/clinic/doctor-schedule.page').then(
+          import('./features/clinic/Doctor/doctor-schedule.page').then(
             (m) => m.DoctorSchedulePage,
           ),
       },
@@ -85,7 +87,7 @@ export const routes: Routes = [
       {
         path: 'consultorios',
         loadComponent: () =>
-          import('./features/clinic/clinic-rooms.page').then(
+          import('./features/clinic/SuperAdmin/clinic-rooms.page').then(
             (m) => m.ClinicRoomsPage,
           ),
       },
@@ -94,7 +96,7 @@ export const routes: Routes = [
       {
         path: 'doctores',
         loadComponent: () =>
-          import('./features/clinic/clinic-doctors.page').then(
+          import('./features/clinic/SuperAdmin/clinic-doctors.page').then(
             (m) => m.ClinicDoctorsPage,
           ),
       },
@@ -120,10 +122,36 @@ export const routes: Routes = [
             (m) => m.DentistDashboardPage,
           ),
       },
+      // ---------- RUTAS DE CITAS / AGENDAS (odontólogo) ----------
+
+      {
+        path: 'citas',
+        loadComponent: () =>
+          import('./features/appointments/calendar/appointments-calendar.page')
+            .then(m => m.AppointmentsCalendarPage),
+      },
+
+
+      {
+
+        path: 'pacientes/:id/consultas',
+        loadComponent: () =>
+          import('./features/clinic/consultations/consultation-list.page')
+            .then(m => m.ConsultationListPage),
+      },
+
+
+      {
+        path: 'pacientes/:id/consultas/:consultationId',
+        loadComponent: () =>
+          import('./features/clinic/consultations/consultation-detail.page')
+            .then(m => m.ConsultationDetailPage),
+      },
+
       {
         path: 'horarios',
         loadComponent: () =>
-          import('./features/clinic/doctor-schedule.page').then(
+          import('./features/clinic/Doctor/doctor-schedule.page').then(
             (m) => m.DoctorSchedulePage,
           ),
       },
@@ -139,31 +167,66 @@ export const routes: Routes = [
       {
         path: 'pacientes',
         loadComponent: () =>
-          import('./features/clinic/patients/patient-list.page').then(
+          import('./features/clinic/patients/clinical_record_patient/patient-list.page').then(
             (m) => m.PatientListPage,
           ),
       },
       {
         path: 'pacientes/nuevo',
         loadComponent: () =>
-          import('./features/clinic/patients/patient-create-wizard.page').then(
+          import('./features/clinic/patients/clinical_record_patient/patient-create-wizard.page').then(
             (m) => m.PatientCreateWizardPage,
           ),
       },
       {
         path: 'pacientes/:id',
         loadComponent: () =>
-          import('./features/clinic/patients/patient-detail.page').then(
+          import('./features/clinic/patients/clinical_record_patient/patient-detail.page').then(
             (m) => m.PatientDetailPage,
           ),
       },
+
+      {
+        path: 'pacientes/:id/timeline',
+        canActivate: [ClinicalRecordRequiredGuard],
+        loadComponent: () =>
+          import('./features/clinic/patients/timeline/patient-timeline.page')
+            .then(m => m.PatientTimelinePage),
+      },
+
 
       // 🆕 Historia clínica del paciente
       {
         path: 'pacientes/:id/historia-clinica',
         loadComponent: () =>
-          import('./features/clinic/patients/clinical-record.page').then(
+          import('./features/clinic/patients/clinical_record_patient/clinical-record.page').then(
             (m) => m.ClinicalRecordPage,
+          ),
+      },
+
+      {
+        path: 'pacientes/:id/imagenes-clinicas',
+        loadComponent: () =>
+          import(
+            './features/clinic/patients/clinical_record_patient/patient-clinical-images.page'
+            ).then(m => m.PatientClinicalImagesPage),
+      },
+
+      {
+        path: 'pacientes/:id/odontograma',
+        canActivate: [ActiveConsultationRequiredGuard],
+        loadComponent: () =>
+          import('./features/clinic/patients/odontogram/odontogram.page')
+            .then(m => m.OdontogramPage),
+      },
+
+
+// opcional: historial de odontogramas / versiones
+      {
+        path: 'pacientes/:id/odontograma/history',
+        loadComponent: () =>
+          import('./features/clinic/patients/odontogram/odontogram-history.page').then(
+            (m) => m.OdontogramHistoryPage,
           ),
       },
 
@@ -171,12 +234,13 @@ export const routes: Routes = [
     ],
   },
 
+
   // Completar perfil profesional (cuando falta wizard)
   {
     path: 'completar-perfil',
     canActivate: [AuthGuard],
     loadComponent: () =>
-      import('./features/clinic/doctor-complete-profile.page').then(
+      import('./features/clinic/Doctor/doctor-complete-profile.page').then(
         (m) => m.DoctorCompleteProfilePage,
       ),
   },

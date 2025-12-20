@@ -5,7 +5,7 @@ import { CommonModule, isPlatformBrowser, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../../environments/environment';
 
 interface MeResponse {
   id: number;

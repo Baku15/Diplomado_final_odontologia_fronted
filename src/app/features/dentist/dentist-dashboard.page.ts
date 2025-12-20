@@ -1,8 +1,11 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {Component, inject, OnInit,} from '@angular/core';
 import { CommonModule, NgIf } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import {environment} from '../../../environments/environment';
+import { PLATFORM_ID,  } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 interface DoctorDayScheduleDto {
   dayOfWeek: number;
@@ -138,19 +141,34 @@ interface DoctorWeeklyScheduleDto {
 export class DentistDashboardPage implements OnInit {
 
   private http = inject(HttpClient);
+  private platformId = inject(PLATFORM_ID);
+
 
   loaded = false;
   hasSchedule = false;
 
   async ngOnInit(): Promise<void> {
+
+    // 🛡️ SSR-SAFE: no llamar APIs protegidas en el servidor
+    if (!isPlatformBrowser(this.platformId)) {
+      // Render SSR: no sabemos aún si tiene horarios
+      this.loaded = false;
+      return;
+    }
+
     try {
       const weekly = await firstValueFrom(
-        this.http.get<DoctorWeeklyScheduleDto>('/api/doctor/me/schedule')
+        this.http.get<DoctorWeeklyScheduleDto>(
+          `${environment.apiBase}/api/doctor/me/schedule`
+        )
       );
+
       const days = weekly?.days ?? [];
       this.hasSchedule = days.some(d => d.working);
+
     } catch (err) {
-      console.error('DentistDashboardPage: error verificando horarios', err);
+      // ⚠️ Error esperado si el token aún no está listo
+      console.warn('[DentistDashboard] No se pudo verificar horarios aún');
       this.hasSchedule = false;
     } finally {
       this.loaded = true;
