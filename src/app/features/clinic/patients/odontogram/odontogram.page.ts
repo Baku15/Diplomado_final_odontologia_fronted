@@ -1342,7 +1342,17 @@ export class OdontogramPage implements OnInit {
 
     if (!ev.requireNextAppointment) {
       this.activeConsultation = null;
-      this.router.navigate(['/dashboard/pacientes', this.patientId]);
+      this.router.navigate(
+        ['/dashboard/pacientes', this.patientId],
+        {
+          state: {
+            flashMessage: {
+              type: 'success',
+              message: 'Consulta cerrada correctamente'
+            }
+          }
+        }
+      );
       return;
     }
 

@@ -12,15 +12,26 @@
       <label>Hora inicio</label>
       <input type="text" [value]="startTime" disabled>
     </div>
+    <div class="section">
+      <h3>Duración de la cita</h3>
 
-    <div class="field">
-      <label>Duración</label>
-      <select [(ngModel)]="durationMinutes">
-        <option [value]="30">30 minutos</option>
-        <option [value]="45">45 minutos</option>
-        <option [value]="60">60 minutos</option>
-      </select>
+      <div class="duration-control">
+        <button type="button" (click)="decreaseDuration()">−</button>
+
+        <div class="duration-value">
+          <strong>{{ durationMinutes }}</strong>
+          <span>minutos</span>
+        </div>
+
+        <button type="button" (click)="increaseDuration()">+</button>
+      </div>
+
+      <div class="duration-meta">
+        <span>{{ durationMinutes / 60 | number:'1.0-1' }} horas</span>
+        <span>• STEP {{ STEP_MINUTES }} min</span>
+      </div>
     </div>
+
 
     <div class="field">
       <label>Hora fin</label>
@@ -29,7 +40,11 @@
 
     <div class="field">
       <label>Motivo</label>
-      <input type="text" [(ngModel)]="reason" placeholder="Ej: Continuar tratamiento">
+      <textarea
+        [(ngModel)]="reason"
+        rows="2"
+        placeholder="Ej: Cirugía de implante, tratamiento prolongado…"
+      ></textarea>
     </div>
 
     <hr>
@@ -60,11 +75,20 @@
 
     <div *ngIf="error" class="error">
       {{ error }}
+      {{ error }}
     </div>
 
     <div class="actions">
       <button (click)="cancel()">Cancelar</button>
       <button [disabled]="saving" (click)="save()">Guardar cita</button>
+      <button
+        *ngIf="editMode"
+        class="text-red-600 border border-red-300 hover:bg-red-50"
+        (click)="cancelAppointment()"
+      >
+        Cancelar cita
+      </button>
+
     </div>
 
   </div>

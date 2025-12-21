@@ -4,20 +4,30 @@ export type AppointmentStatus =
   | 'CANCELLED'
   | 'NO_SHOW';
 
+export type AppointmentOrigin =
+  | 'DIRECT'
+  | 'CLINICAL';
+
 export interface Appointment {
   id: number;
-  date: string;          // YYYY-MM-DD
-  startTime: string;     // HH:mm
-  endTime: string;       // HH:mm
+  date: string;
+  startTime: string;
+  endTime: string;
   durationMinutes: number;
   status: AppointmentStatus;
+
+  // 🔥 OBLIGATORIO
+  origin: AppointmentOrigin;
+
   reason?: string;
 
   sendEmail?: boolean;
   sendWhatsapp?: boolean;
   reminderMinutesBefore?: number;
 
-  patientId: number;
+  // 🔥 DIRECT puede no tener paciente
+  patientId?: number;
+
   doctorId: number;
   consultationId?: number;
 }

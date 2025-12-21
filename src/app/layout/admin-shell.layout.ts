@@ -11,6 +11,7 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
+import { ToastComponent } from '../shared/toast/toast.component';
 
 @Component({
   standalone: true,
@@ -22,6 +23,8 @@ import { AuthService } from '../core/services/auth.service';
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
+    ToastComponent,
+
   ],
   template: `
     <div class="flex min-h-screen bg-slate-100">
@@ -277,8 +280,12 @@ import { AuthService } from '../core/services/auth.service';
         <main class="flex-1 overflow-y-auto p-4 md:p-6">
           <router-outlet></router-outlet>
         </main>
+
+        <app-toast></app-toast>
+
       </div>
     </div>
+
   `,
 })
 export class AdminShellLayout {

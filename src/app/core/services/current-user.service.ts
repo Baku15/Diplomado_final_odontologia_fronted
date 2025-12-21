@@ -8,6 +8,7 @@ import { map } from 'rxjs/operators';
 export class CurrentUserService {
   private oidc = inject(OidcSecurityService);
 
+
   // Helper: get raw userData as any (safety: convert to any to avoid TS index errors)
   private async getRawUserData(): Promise<any> {
     try {

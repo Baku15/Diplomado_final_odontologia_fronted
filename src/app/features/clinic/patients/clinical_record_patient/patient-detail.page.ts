@@ -5,7 +5,6 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { PatientService } from '../../../../core/services/patient.service';
 import { ClinicalRecordService } from '../../../../core/services/clinical-record.service';
 import { PatientDetail } from '../../../../core/models/patient.model';
-
 @Component({
   standalone: true,
   selector: 'app-patient-detail',
@@ -14,6 +13,47 @@ import { PatientDetail } from '../../../../core/models/patient.model';
   template: `
     <div class="min-h-screen bg-slate-50 px-4 py-6">
       <div class="max-w-7xl mx-auto">
+
+        <!-- ========================= -->
+        <!-- FLASH MESSAGE -->
+        <!-- ========================= -->
+        <div
+          *ngIf="flashMessage"
+          class="fixed top-5 right-5 z-[200] animate-fade-in"
+        >
+          <div
+            class="rounded-xl shadow-lg px-4 py-3 flex items-start gap-3"
+            [ngClass]="{
+      'bg-emerald-50 border border-emerald-300 text-emerald-800': flashMessage.type === 'success',
+      'bg-rose-50 border border-rose-300 text-rose-800': flashMessage.type === 'error'
+    }"
+          >
+            <svg
+              *ngIf="flashMessage.type === 'success'"
+              class="w-5 h-5 text-emerald-600 mt-0.5"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clip-rule="evenodd"
+              />
+            </svg>
+
+            <div class="text-sm font-medium">
+              {{ flashMessage.message }}
+            </div>
+
+            <button
+              class="ml-2 text-slate-500 hover:text-slate-700"
+              (click)="flashMessage = null"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
         <!-- Header simplificado -->
         <div class="mb-6">
           <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
@@ -770,6 +810,19 @@ export class PatientDetailPage implements OnInit {
   // ------------------------------------------
 
   async ngOnInit(): Promise<void> {
+
+    const state = history.state as any;
+
+    if (state?.flashMessage) {
+      this.flashMessage = state.flashMessage;
+
+      this.flashTimeout = setTimeout(() => {
+        this.flashMessage = null;
+      }, 4000);
+
+      history.replaceState({}, document.title);
+    }
+
     this.patientId = Number(this.route.snapshot.paramMap.get('id'));
     if (!this.patientId) {
       this.error = 'ID de paciente inválido.';
@@ -803,6 +856,8 @@ export class PatientDetailPage implements OnInit {
     } finally {
       this.loading = false;
     }
+
+
   }
 
   patchForm(p: PatientDetail) {
@@ -899,9 +954,18 @@ export class PatientDetailPage implements OnInit {
       this.viewMode = 'summary';
 
       // Mostrar mensaje de éxito
-      await this.router.navigateByUrl('/dashboard/pacientes', {
-        state: { message: 'Paciente actualizado correctamente.' },
-      });
+      await this.router.navigate(
+        ['/dashboard/pacientes', this.patientId],
+        {
+          state: {
+            flashMessage: {
+              type: 'success',
+              message: 'Paciente actualizado correctamente'
+            }
+          }
+        }
+      );
+
     } catch (err: any) {
       console.error('Error actualizando paciente', err);
       this.error = err?.error?.message || err?.message || 'No se pudo actualizar el paciente.';
@@ -919,9 +983,18 @@ export class PatientDetailPage implements OnInit {
     try {
       await this.patientService.deletePatient(this.patientId);
       this.showConfirmDelete = false;
-      await this.router.navigateByUrl('/dashboard/pacientes', {
-        state: { message: 'Paciente eliminado correctamente.' },
-      });
+      await this.router.navigate(
+        ['/dashboard/pacientes'],
+        {
+          state: {
+            flashMessage: {
+              type: 'success',
+              message: 'Paciente eliminado correctamente'
+            }
+          }
+        }
+      );
+
     } catch (err: any) {
       console.error('Error eliminando paciente', err);
       this.error = err?.error?.message || err?.message || 'No se pudo eliminar el paciente.';
@@ -932,6 +1005,7 @@ export class PatientDetailPage implements OnInit {
   goBack() {
     this.router.navigateByUrl('/dashboard/pacientes');
   }
+
 
   // ===== Clinical record helpers =====
   private async loadClinicalRecordMeta(): Promise<void> {
@@ -1006,4 +1080,16 @@ export class PatientDetailPage implements OnInit {
       return '—';
     }
   }
+
+  // =========================
+// FLASH MESSAGE
+// =========================
+  flashMessage: {
+    type: 'success' | 'error';
+    message: string;
+  } | null = null;
+
+  private flashTimeout: any = null;
+
+
 }

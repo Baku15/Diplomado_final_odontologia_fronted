@@ -204,4 +204,11 @@ export class AuthService {
       }
     }
   }
+
+  // 🔥 USADO POR AGENDA / CITAS (completeDirectAppointment)
+  getUsername(): string {
+    const user = this._userData.getValue();
+    return user?.username || '';
+  }
+
 }

@@ -42,3 +42,137 @@
   gap: 10px;
   margin-top: 16px;
 }
+
+/* ===============================
+   DURACIÓN DINÁMICA
+================================ */
+.duration-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.duration-grid button {
+  padding: 8px 0;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.duration-grid button:hover {
+  background: #eef2ff;
+}
+
+.duration-grid button.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.duration-hint {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.modal {
+  background: #fff;
+  width: 460px;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.15);
+}
+
+h2 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.section {
+  margin: 16px 0;
+}
+
+.section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #334155;
+}
+
+/* DURACIÓN */
+.duration-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.duration-control button {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.duration-control button:hover {
+  background: #1d4ed8;
+}
+
+.duration-value {
+  flex: 1;
+  text-align: center;
+}
+
+.duration-value strong {
+  font-size: 22px;
+  display: block;
+}
+
+.duration-value span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.duration-meta {
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* INPUTS */
+input, textarea, select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 14px;
+}
+
+textarea {
+  resize: none;
+}
+
+/* ACTIONS */
+.actions button {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.actions button:first-child {
+  background: #e5e7eb;
+}
+
+.actions button:last-child {
+  background: #2563eb;
+  color: white;
+}

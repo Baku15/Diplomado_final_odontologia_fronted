@@ -2,71 +2,80 @@
 
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import {ActivatedRoute, Router} from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import {firstValueFrom, Observable} from 'rxjs';
 
 import { AppointmentsService } from '../../../core/services/appointments.service';
 import { Appointment } from '../../../core/models/appointment.model';
 import { DoctorSchedule } from '../../../core/models/doctor-schedule.model';
 import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
+import {CurrentUserService} from '../../../core/services/current-user.service';
+import {AuthService} from '../../../core/services/auth.service';
+import {HttpClient} from '@angular/common/http';
+import {AppointmentDetailModal} from '../appointment/appointment-detail.modal';
+import { ViewChild } from '@angular/core';
+import { ToastComponent } from '../../../shared/toast/toast.component';
 
+
+interface MeResponse {
+  id: number;
+  username: string;
+  roles: string[];
+  clinicId?: number | null;
+}
 
 @Component({
   standalone: true,
   selector: 'app-appointments-calendar-page',
-  imports: [CommonModule, FormsModule, CreateAppointmentModal],
+  imports: [CommonModule, FormsModule, CreateAppointmentModal,AppointmentDetailModal,ToastComponent],
   template: `
-    <div class="p-6 bg-slate-100 min-h-screen">
+  <div class="p-6 bg-slate-100 min-h-screen">
 
-      <!-- HEADER -->
-      <div class="flex items-center justify-between mb-6 border-b pb-4">
-
-        <div>
-          <h1 class="text-2xl font-semibold text-slate-800">Agenda</h1>
-          <p class="text-sm text-slate-500">
-            {{ visibleDateLabel }}
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button class="btn-nav" (click)="goPrevBlock()">←</button>
-
-          <button class="btn-nav btn-primary" (click)="goToday()">
-            Hoy
-          </button>
-
-          <button class="btn-nav" (click)="goNextBlock()">→</button>
-
-          <input
-            type="date"
-            [(ngModel)]="baseDate"
-            (change)="onBaseDateChange()"
-            class="ml-3 rounded border px-2 py-1 text-sm bg-white"
-          />
-        </div>
+    <!-- HEADER -->
+    <div class="flex items-center justify-between mb-6 border-b pb-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-800">Agenda</h1>
+        <p class="text-sm text-slate-500">
+          {{ visibleDateLabel }}
+        </p>
       </div>
 
-      <!-- ALERTA -->
-      <div
-        *ngIf="!hasAnyWorkingScheduleInView()"
-        class="mb-4 border border-amber-300 bg-amber-100 text-amber-900 px-4 py-2 text-sm rounded"
-      >
-        ⚠️ No tienes horario de atención para este día.
-      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn-nav" (click)="goPrevBlock()">←</button>
 
-      <!-- CALENDARIO -->
+        <button class="btn-nav btn-primary" (click)="goToday()">
+          Hoy
+        </button>
+
+        <button class="btn-nav" (click)="goNextBlock()">→</button>
+
+        <input
+          type="date"
+          [(ngModel)]="baseDate"
+          (change)="onBaseDateChange()"
+          class="ml-3 rounded border px-2 py-1 text-sm bg-white"
+        />
+      </div>
+    </div>
+
+    <!-- ALERTA -->
+    <div
+      *ngIf="!hasAnyWorkingScheduleInView()"
+      class="mb-4 border border-amber-300 bg-amber-100 text-amber-900 px-4 py-2 text-sm rounded"
+    >
+      ⚠️ No tienes horario de atención para este día.
+    </div>
+
+    <!-- CALENDARIO -->
+    <div class="calendar-scroll">
       <div class="calendar-grid">
 
         <!-- HORAS -->
         <div class="hours-col">
           <div class="hour-header-spacer"></div>
-
-          <div
-            *ngFor="let h of hours"
-            class="hour-label"
-          >
-            {{ h }}:00
+          <div *ngFor="let t of timeSlots" class="hour-label">
+            {{ t }}
           </div>
         </div>
 
@@ -77,27 +86,20 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
           [class.today-column]="isToday(day)"
         >
 
-
-        <!-- HEADER DÍA -->
+          <!-- HEADER DÍA -->
           <div class="day-header">
-            {{ day }}
+            <span class="day-name">{{ getDayName(day) }}</span>
+            <span class="day-date">{{ getDayFullDate(day) }}</span>
           </div>
 
           <!-- SLOTS -->
           <div
-            *ngFor="let h of hours"
+            *ngFor="let t of timeSlots"
             class="time-slot"
-            [ngClass]="slotClassForDay(day, h)"
-            [attr.title]="slotTooltipForDay(day, h)"
-            (click)="openCreateModalForDay(day, h)"
-          >
-        <span
-          *ngIf="isBreakTimeForDay(day, h)"
-          class="slot-break-label"
-        >
-          Descanso
-        </span>
-          </div>
+            [ngClass]="slotClassForDayTime(day, t)"
+            [attr.title]="slotTooltipForDayTime(day, t)"
+            (click)="openCreateModalForDayTime(day, t)"
+          ></div>
 
           <!-- CITAS -->
           <div
@@ -105,8 +107,20 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
             class="appointment-card"
             [ngClass]="statusClass(ap.status)"
             [style.top.px]="calcTop(ap.startTime) + 36"
-            [style.height.px]="calcHeight(ap.durationMinutes) - 2"
+            [style.height.px]="calcHeight(getNormalizedDuration(ap)) - 2"
+            (click)="openAppointmentActions($event, ap)"
           >
+
+            <!-- DESCANSO -->
+            <div
+              *ngFor="let b of getBreakBlocksForDay(day)"
+              class="appointment-card break-card"
+              [style.top.px]="calcTop(b.startTime) + 36"
+              [style.height.px]="calcHeight(b.durationMinutes) - 2"
+            >
+              Descanso
+            </div>
+
             <div class="appointment-time">
               {{ ap.startTime }} – {{ ap.endTime }}
             </div>
@@ -117,26 +131,103 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
             >
               {{ ap.reason || 'Consulta' }}
             </div>
-
           </div>
-
         </div>
       </div>
+    </div>
 
-      <!-- MODAL -->
-      <app-create-appointment-modal
-        *ngIf="showCreateModal"
-        [clinicId]="clinicId"
-        [patientId]="patientId"
-        [doctorId]="doctorId"
-        [consultationId]="consultationId"
-        [date]="selectedDate"
-        [startTime]="selectedStartTime"
-        (close)="onModalClosed($event)">
-      </app-create-appointment-modal>
+    <!-- ========================= -->
+    <!-- 🎯 MENÚ DE ACCIONES CITA -->
+    <!-- ========================= -->
+    <div
+      *ngIf="showAppointmentActions"
+      class="fixed z-[200] bg-white border rounded-lg shadow-xl w-52 text-sm overflow-hidden"
+      [style.left.px]="actionPosition.x"
+      [style.top.px]="actionPosition.y"
+      (click)="$event.stopPropagation()"
+    >
+
+
+      <!-- ✏️ EDITAR -->
+      <button
+        *ngIf="selectedAppointment && isEditable(selectedAppointment)"
+        (click)="editAppointment()"
+        class="action-btn flex items-center gap-2"
+      >
+        ✏️ Editar
+      </button>
+
+      <!-- 🚫 NO SHOW -->
+      <button
+        *ngIf="selectedAppointment && isEditable(selectedAppointment) && isPastAppointment(selectedAppointment)"
+        (click)="markNoShow()"
+        class="action-btn flex items-center gap-2 text-amber-600"
+      >
+        🚫 No asistió
+      </button>
+
+      <!-- ❌ CANCELAR -->
+      <button
+        *ngIf="selectedAppointment && !isEditable(selectedAppointment)"
+        (click)="cancelAppointment()"
+        class="action-btn danger flex items-center gap-2"
+      >
+        ❌ Cancelar
+      </button>
+
+      <button
+        *ngIf="!isEditable(selectedAppointment!)"
+        (click)="openDetail(selectedAppointment!)"
+        class="action-btn flex items-center gap-2"
+      >
+        👁️ Ver detalle
+      </button>
+
+      <!-- ✅ MARCAR COMO COMPLETADA (SOLO DIRECT) -->
+      <button
+        *ngIf="selectedAppointment && canCompleteDirect(selectedAppointment)"
+        (click)="completeDirectAppointment()"
+        class="action-btn flex items-center gap-2 text-emerald-600"
+      >
+        ✅ Marcar como completada
+      </button>
+
+
 
     </div>
+
+    </div>
+
+    <!-- BACKDROP (CIERRA MENÚ AL CLICK FUERA) -->
+    <div
+      *ngIf="showAppointmentActions"
+      class="fixed inset-0 z-[150]"
+      (click)="closeAppointmentActions()"
+    ></div>
+
+    <!-- MODAL CREAR / EDITAR CITA -->
+    <app-create-appointment-modal
+      *ngIf="showCreateModal"
+      [clinicId]="clinicId"
+      [patientId]="patientId"
+      [doctorId]="doctorId"
+      [consultationId]="consultationId"
+      [appointment]="editingAppointment"
+      [editMode]="!!editingAppointment"
+      [date]="selectedDate"
+      [startTime]="selectedStartTime"
+      (close)="onModalClosed($event)">
+    </app-create-appointment-modal>
+
+  <app-appointment-detail-modal
+    *ngIf="showDetailModal && detailAppointment"
+    [appointment]="detailAppointment"
+    [clinicId]="clinicId"
+    (close)="onCloseDetailModal()">
+  </app-appointment-detail-modal>
+  <app-toast></app-toast>
   `,
+
   styles: [`
     /* ===============================
    BOTONES
@@ -150,8 +241,57 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
       cursor: pointer;
     }
 
+    /* ===============================
+   MENÚ ACCIONES CITA
+================================ */
+    .action-btn {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      text-align: left;
+      background: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .action-btn:hover {
+      background: #f1f5f9;
+    }
+
+    .action-btn.danger {
+      color: #dc2626;
+    }
+
+    .action-btn.danger:hover {
+      background: #fee2e2;
+    }
+
+
     .btn-nav:hover {
       background: #eef2ff;
+    }
+
+    .break-card {
+      background-color: #fde68a;
+      color: #92400e;
+      font-weight: 600;
+      cursor: default;
+    }
+
+    /* ===============================
+   SCROLL VERTICAL DEL CALENDARIO
+================================ */
+    .calendar-scroll {
+      max-height: calc(100vh - 220px); /* ajusta según tu header */
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Mantiene header del día fijo */
+    .day-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
     }
 
     .btn-primary {
@@ -186,13 +326,16 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
     }
 
     .hour-label {
-      height: 64px;
-      font-size: 12px;
+      height: 48px; /* debe coincidir con el slot */
+      font-size: 11px;
       color: #000000;
       text-align: right;
       padding-right: 8px;
       padding-top: 6px;
+      box-sizing: border-box;
     }
+
+
 
     /* ===============================
        DÍAS
@@ -236,12 +379,15 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
        SLOTS
     ================================ */
     .time-slot {
-      height: 64px;
+      height: 48px; /* 30 minutos - MÁS GRANDE */
       width: 100%;
-      border-bottom: 1px solid #d1d5db;
+      border-bottom: 1px solid #e5e7eb;
       box-sizing: border-box;
       position: relative;
+      background: transparent;
     }
+
+
 
     .slot-break-label {
       font-size: 11px;
@@ -341,18 +487,83 @@ import {CreateAppointmentModal} from '../appointment/create-appointment.modal';
       background-color: #dc2626;
     }
 
+    .day-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;              /* separación horizontal */
+      white-space: nowrap;  /* 🔒 evita salto de línea */
+    }
+
+    .day-header .day-name {
+      font-weight: 700;
+      font-size: 12px;
+      color: #1e293b; /* slate-800 */
+      letter-spacing: 0.5px;
+    }
+
+    .day-header .day-date {
+      font-weight: 500;
+      font-size: 11px;
+      color: #475569; /* slate-600 */
+    }
+    .bg-completed {
+      background-color: #16a34a;
+      opacity: 0.85;
+      cursor: default;
+    }
+
+    .bg-cancelled {
+      background-color: #9ca3af;
+      opacity: 0.7;
+      text-decoration: line-through;
+      cursor: default;
+    }
+
+    .bg-no-show {
+      background-color: #dc2626;
+      opacity: 0.85;
+      cursor: default;
+    }
+
+
+
 
   `]
 })
 export class AppointmentsCalendarPage implements OnInit {
 
+  // ==============================
+// 🎯 MENÚ DE ACCIONES CITA
+// ==============================
+  @ViewChild(ToastComponent)
+  toast!: ToastComponent;
+  showDetailModal = false;
+  detailAppointment?: Appointment;
+
+  selectedAppointment?: Appointment;
+  showAppointmentActions = false;
+  actionPosition = {x: 0, y: 0};
+
+
   private route = inject(ActivatedRoute);
   private appointmentsService = inject(AppointmentsService);
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
+
+  private http = inject(HttpClient);
+  private readonly STEP_MINUTES = 30;
+  private readonly PIXELS_PER_SLOT = 48; // 30 minutos (más grande)
+  private readonly START_HOUR = 8;        // inicio del calendario
+
 
   clinicId!: number;
   doctorId!: number;
-  patientId!: number;
-  consultationId!: number;
+  patientId?: number;
+  consultationId?: number;
+
+  editingAppointment?: Appointment;
 
   // Fecha base del bloque (inicio de los 5 días)
   baseDate!: string;
@@ -371,24 +582,46 @@ export class AppointmentsCalendarPage implements OnInit {
 
   showCreateModal = false;
 
-  hours = Array.from({ length: 11 }, (_, i) => i + 8);
+  timeSlots: string[] = [];
 
   async ngOnInit() {
     const qp = this.route.snapshot.queryParamMap;
+// 🔥 OBTENER DOCTOR REAL DESDE BACKEND
+    const me = await firstValueFrom(
+      this.http.get<MeResponse>('/api/me')
+    );
+
+    this.generateTimeSlots();
+
+// 🛡️ Defensa real
+    if (!me || !me.id) {
+      throw new Error('No se pudo determinar el odontólogo autenticado');
+    }
+
+    this.doctorId = me.id;
 
     this.clinicId = Number(qp.get('clinicId')) || 1;
-    this.doctorId = Number(qp.get('doctorId'));
-    this.patientId = Number(qp.get('patientId'));
-    this.consultationId = Number(qp.get('consultationId'));
 
-    this.baseDate = new Date().toISOString().substring(0, 10);
-    this.selectedDate = this.baseDate; // 🔥 ESTA FALTABA
+
+    // 🔹 Solo existen si venimos del flujo clínico
+    this.patientId = qp.get('patientId')
+      ? Number(qp.get('patientId'))
+      : undefined;
+
+    this.consultationId = qp.get('consultationId')
+      ? Number(qp.get('consultationId'))
+      : undefined;
+    // 🔹 Fechas
+    this.baseDate = this.getLocalDateString();
+    this.selectedDate = this.baseDate;
 
     this.recalculateVisibleDates();
+
 
     await this.loadDoctorSchedule();
     await this.loadAgenda();
   }
+
 
   onDateChange() {
     this.loadAgenda();
@@ -415,7 +648,8 @@ export class AppointmentsCalendarPage implements OnInit {
         this.appointmentsService.getDoctorAgenda(
           this.clinicId,
           this.doctorId,
-          day
+          day,
+          this.patientId || undefined
         )
       ) ?? [];
 
@@ -495,21 +729,34 @@ export class AppointmentsCalendarPage implements OnInit {
     this.showCreateModal = true;
   }
 
-  onModalClosed(created: boolean) {
+  onModalClosed(updated: boolean) {
     this.showCreateModal = false;
-    if (created) this.loadAgenda();
+    this.editingAppointment = undefined;
+
+    if (updated) {
+      this.loadAgenda();
+    }
   }
 
+
 // Escala compacta estilo DocPlanner
-  private readonly PIXELS_PER_HOUR = 64;
 
   calcTop(start: string): number {
     const [h, m] = start.split(':').map(Number);
-    return ((h - 8) * 60 + m) * (this.PIXELS_PER_HOUR / 60);
+
+    const minutesFromStart =
+      (h - this.START_HOUR) * 60 + m;
+
+    const slotsFromStart = minutesFromStart / this.STEP_MINUTES;
+
+    return slotsFromStart * this.PIXELS_PER_SLOT;
   }
 
+
   calcHeight(duration: number): number {
-    return duration * (this.PIXELS_PER_HOUR / 60);
+    const normalized = this.normalizeDuration(duration);
+    const slots = normalized / this.STEP_MINUTES;
+    return slots * this.PIXELS_PER_SLOT;
   }
 
 
@@ -585,7 +832,7 @@ export class AppointmentsCalendarPage implements OnInit {
   }
 
   goToday() {
-    this.baseDate = new Date().toISOString().substring(0, 10);
+    this.baseDate = this.getLocalDateString()
     this.selectedDate = this.baseDate; // 🔧
     this.recalculateVisibleDates();
     this.loadAgenda();
@@ -669,9 +916,6 @@ export class AppointmentsCalendarPage implements OnInit {
       return 'bg-slate-100 cursor-not-allowed';
     }
 
-    if (this.isBreakTimeForDay(day, hour)) {
-      return 'bg-amber-100 cursor-not-allowed';
-    }
 
     if (!this.isSlotAvailableForDay(day, hour)) {
       return 'bg-slate-300 cursor-not-allowed';
@@ -741,6 +985,7 @@ export class AppointmentsCalendarPage implements OnInit {
 
     return 'Click para agendar cita';
   }
+
   isToday(day: string): boolean {
     const today = new Date();
     const [y, m, d] = day.split('-').map(Number);
@@ -768,6 +1013,369 @@ export class AppointmentsCalendarPage implements OnInit {
       const schedule = this.getScheduleForDay(day);
       return schedule?.active;
     });
+  }
+
+  getLocalDateString(): string {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  normalizeDuration(minutes: number): number {
+    return Math.ceil(minutes / this.STEP_MINUTES) * this.STEP_MINUTES;
+  }
+
+  timeToMinutes(time: string): number {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  isIntervalAvailable(
+    day: string,
+    startTime: string,
+    durationMinutes: number
+  ): boolean {
+
+    const start = this.timeToMinutes(startTime);
+    const end = start + this.normalizeDuration(durationMinutes);
+
+    return !this.appointments.some(a => {
+      if (a.date !== day) return false;
+
+      const aStart = this.timeToMinutes(a.startTime);
+      const aEnd = aStart + this.normalizeDuration(a.durationMinutes);
+
+      return start < aEnd && end > aStart;
+    });
+  }
+
+  getNormalizedDuration(ap: Appointment): number {
+    return Math.ceil(ap.durationMinutes / 30) * 30;
+  }
+
+  getBreakBlocksForDay(day: string) {
+    const schedule = this.getScheduleForDay(day);
+    if (!schedule?.hasBreak) return [];
+
+    const start = schedule.breakStart!;
+    const end = schedule.breakEnd!;
+
+    return [{
+      startTime: start,
+      durationMinutes:
+        this.timeToMinutes(end) - this.timeToMinutes(start)
+    }];
+  }
+
+
+  generateTimeSlots() {
+    this.timeSlots = [];
+
+    for (let h = 8; h < 22; h++) {
+      this.timeSlots.push(`${String(h).padStart(2, '0')}:00`);
+      this.timeSlots.push(`${String(h).padStart(2, '0')}:30`);
+    }
+  }
+
+  slotClassForDayTime(day: string, time: string): string {
+
+    if (this.isPastDay(day)) {
+      return 'bg-slate-200 cursor-not-allowed';
+    }
+
+    if (this.isPastSlotTime(day, time)) {
+      return 'bg-slate-200 cursor-not-allowed';
+    }
+
+    if (!this.hasWorkingScheduleForDayDate(day)) {
+      return 'bg-slate-100 cursor-not-allowed';
+    }
+
+    if (!this.isWithinWorkingHoursForDayTime(day, time)) {
+      return 'bg-slate-100 cursor-not-allowed';
+    }
+
+    if (!this.isIntervalAvailable(day, time, this.STEP_MINUTES)) {
+      return 'bg-slate-300 cursor-not-allowed';
+    }
+
+    return 'bg-white hover:bg-emerald-50 cursor-pointer';
+  }
+
+  slotTooltipForDayTime(day: string, time: string): string {
+
+    if (this.isPastDay(day)) {
+      return 'No se pueden agendar citas en fechas pasadas';
+    }
+
+    if (this.isPastSlotTime(day, time)) {
+      return 'Este horario ya pasó';
+    }
+
+    if (!this.hasWorkingScheduleForDayDate(day)) {
+      return 'No atiendes este día';
+    }
+
+    if (!this.isWithinWorkingHoursForDayTime(day, time)) {
+      return 'Fuera de tu horario de atención';
+    }
+
+    if (!this.isIntervalAvailable(day, time, this.STEP_MINUTES)) {
+      return 'Ya existe una cita en este horario';
+    }
+
+    return 'Click para agendar cita';
+  }
+
+  openCreateModalForDayTime(day: string, time: string) {
+
+    if (this.isPastDay(day)) return;
+    if (this.isPastSlotTime(day, time)) return;
+    if (!this.hasWorkingScheduleForDayDate(day)) return;
+    if (!this.isWithinWorkingHoursForDayTime(day, time)) return;
+    if (!this.isIntervalAvailable(day, time, this.STEP_MINUTES)) return;
+
+    this.selectedDate = day;
+    this.selectedStartTime = time;
+
+    this.editingAppointment = undefined;
+
+    // 🔥 CLAVE ABSOLUTA
+    // SOLO limpiar si NO venimos del flujo clínico
+    if (!this.consultationId) {
+      this.patientId = undefined;
+    }
+
+    // ⚠️ NO TOCAR consultationId AQUÍ
+    // Si venimos del odontograma, ya existe y define ORIGIN = CLINICAL
+
+    this.showCreateModal = true;
+  }
+
+
+
+  isPastSlotTime(day: string, time: string): boolean {
+    const [h, m] = time.split(':').map(Number);
+    const [y, mo, d] = day.split('-').map(Number);
+
+    const slotDate = new Date(y, mo - 1, d, h, m);
+    return slotDate.getTime() <= new Date().getTime();
+  }
+
+  isWithinWorkingHoursForDayTime(day: string, time: string): boolean {
+    const s = this.getScheduleForDay(day);
+    if (!s || !s.active) return false;
+
+    const t = this.timeToMinutes(time);
+    const start = this.timeToMinutes(s.startTime);
+    const end = this.timeToMinutes(s.endTime);
+
+    return t >= start && t + this.STEP_MINUTES <= end;
+  }
+
+  getDayHeaderLabel(day: string): string {
+    const [y, m, d] = day.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+
+    const days = [
+      'DOMINGO',
+      'LUNES',
+      'MARTES',
+      'MIÉRCOLES',
+      'JUEVES',
+      'VIERNES',
+      'SÁBADO'
+    ];
+
+    const dayName = days[date.getDay()];
+    const dayNumber = String(d).padStart(2, '0');
+    const monthNumber = String(m).padStart(2, '0');
+    const yearNumber = y;
+
+    // ✅ FECHA COMPLETA EN UNA SOLA LÍNEA
+    return `${dayName} ${dayNumber}/${monthNumber}/${yearNumber}`;
+  }
+
+  getDayName(day: string): string {
+    const [y, m, d] = day.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+
+    const days = [
+      'DOMINGO',
+      'LUNES',
+      'MARTES',
+      'MIÉRCOLES',
+      'JUEVES',
+      'VIERNES',
+      'SÁBADO'
+    ];
+
+    return days[date.getDay()];
+  }
+
+  getDayFullDate(day: string): string {
+    const [y, m, d] = day.split('-').map(Number);
+    return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+  }
+
+  openAppointmentActions(
+    event: MouseEvent,
+    ap: Appointment
+  ) {
+    event.stopPropagation();
+
+    this.selectedAppointment = ap;
+    this.showAppointmentActions = true;
+
+    this.actionPosition = {
+      x: event.clientX,
+      y: event.clientY
+    };
+  }
+
+  closeAppointmentActions() {
+    this.showAppointmentActions = false;
+    this.selectedAppointment = undefined;
+  }
+
+
+// ✏️ EDITAR
+  editAppointment() {
+    if (!this.selectedAppointment) return;
+
+    const ap = this.selectedAppointment;
+
+    // Agenda administrativa → SIEMPRE editable si está SCHEDULED
+    this.selectedDate = ap.date;
+    this.selectedStartTime = ap.startTime;
+
+    this.patientId = ap.patientId ?? undefined;
+    this.consultationId = ap.consultationId ?? undefined;
+
+    this.editingAppointment = ap;
+    this.showCreateModal = true;
+
+    this.closeAppointmentActions();
+  }
+
+
+
+// ❌ CANCELAR
+  cancelAppointment() {
+    if (!this.selectedAppointment) return;
+
+    const ap = this.selectedAppointment;
+
+    if (ap.patientId == null) {
+      this.closeAppointmentActions();
+      return;
+    }
+
+    this.appointmentsService
+      .cancelAppointment(this.clinicId, ap.patientId, ap.id)
+      .subscribe(() => {
+        this.loadAgenda();
+        this.closeAppointmentActions();
+
+        this.toast.show(
+          'success',
+          'Cita cancelada',
+          'La cita fue cancelada correctamente.'
+        );
+        this.closeAppointmentActions();
+      });
+  }
+
+
+// 🚫 NO SHOW
+  markNoShow() {
+    if (!this.selectedAppointment) return;
+
+    const ap = this.selectedAppointment;
+
+    // 🔒 NO_SHOW requiere paciente
+    if (!ap.patientId) {
+      alert('Esta acción requiere un paciente asociado.');
+      return;
+    }
+
+    this.appointmentsService
+      .markNoShow(
+        this.clinicId,
+        ap.patientId,
+        ap.id
+      )
+      .subscribe(() => this.loadAgenda());
+
+    this.closeAppointmentActions();
+  }
+
+  isEditable(ap: Appointment): boolean {
+    return ap.status === 'SCHEDULED';
+  }
+
+  isAttendable(ap: Appointment): boolean {
+    if (ap.status !== 'SCHEDULED') return false;
+
+    const today = this.getLocalDateString();
+    return ap.date === today;
+  }
+
+  isPastAppointment(ap: Appointment): boolean {
+    const today = this.getLocalDateString();
+    return ap.date < today;
+  }
+
+  openDetail(ap: Appointment) {
+    this.detailAppointment = ap;
+    this.showDetailModal = true;
+
+    // 🔥 cerrar menú de acciones
+    this.closeAppointmentActions();
+  }
+
+  onCloseDetailModal() {
+    this.showDetailModal = false;
+    this.detailAppointment = undefined;
+  }
+
+  canCompleteDirect(ap: Appointment): boolean {
+    return ap.origin === 'DIRECT' && ap.status === 'SCHEDULED';
+  }
+
+  completeDirectAppointment() {
+    if (!this.selectedAppointment) return;
+
+    const ap = this.selectedAppointment;
+
+    this.appointmentsService
+      .completeDirectAppointment(
+        this.clinicId,
+        0,          // 🔥 DIRECT → sin paciente
+        ap.id
+      )
+      .subscribe({
+        next: () => {
+          this.loadAgenda();
+          this.toast.show(
+            'success',
+            'Cita completada',
+            'La cita fue finalizada correctamente.'
+          );
+          this.closeAppointmentActions();
+        },
+        error: () => {
+          this.toast.show(
+            'error',
+            'Error',
+            'No se pudo completar la cita.'
+          );
+        }
+      });
   }
 
 }

@@ -9,18 +9,25 @@ import {environment} from '../../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class AppointmentsService {
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {
+  }
 
   getDoctorAgenda(
     clinicId: number,
     doctorId: number,
-    date: string
+    date: string,
+    patientId?: number
   ): Observable<Appointment[]> {
+
+    const pid = patientId ?? 0; // 👈 CLAVE
+
     return this.http.get<Appointment[]>(
-      `/api/clinic/${clinicId}/patients/0/appointments/doctor/${doctorId}`,
-      { params: { date } }
+      `/api/clinic/${clinicId}/patients/${pid}/appointments/doctor/${doctorId}`,
+      {params: {date}}
     );
+
   }
+
 
   createAppointment(
     clinicId: number,
@@ -74,8 +81,62 @@ export class AppointmentsService {
             breakEnd: d.breakEnd ?? undefined,
             active: d.working === true
           } as DoctorSchedule));
+
         })
       );
   }
+  createAppointmentDirect(
+    clinicId: number,
+    doctorId: number,
+    payload: any
+  ): Observable<Appointment> {
+    return this.http.post<Appointment>(
+      `/api/clinic/${clinicId}/appointments/doctor/${doctorId}`,
+      payload
+    );
+  }
+
+// ✏️ EDITAR CITA EXISTENTE
+  updateAppointment(
+    clinicId: number,
+    patientId: number,
+    appointmentId: number,
+    payload: {
+      durationMinutes: number;
+      reason?: string;
+      sendEmail?: boolean;
+      sendWhatsapp?: boolean;
+      reminderMinutesBefore?: number;
+    }
+  ): Observable<Appointment> {
+    return this.http.put<Appointment>(
+      `/api/clinic/${clinicId}/patients/${patientId}/appointments/${appointmentId}`,
+      payload
+    );
+  }
+
+
+  startConsultationFromAppointment(
+    clinicId: number,
+    appointmentId: number
+  ): Observable<{ patientId: number; consultationId: number }> {
+    return this.http.post<{ patientId: number; consultationId: number }>(
+      `/api/clinic/${clinicId}/appointments/${appointmentId}/start-consultation`,
+      {}
+    );
+  }
+
+  completeDirectAppointment(
+    clinicId: number,
+    patientId: number,
+    appointmentId: number
+  ) {
+    return this.http.post(
+      `/api/clinic/${clinicId}/patients/${patientId}/appointments/${appointmentId}/complete-direct`,
+      {}
+    );
+  }
+
+
 
 }
