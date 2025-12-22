@@ -168,25 +168,27 @@ interface MeResponse {
 
       <!-- ❌ CANCELAR -->
       <button
-        *ngIf="selectedAppointment && !isEditable(selectedAppointment)"
+        *ngIf="selectedAppointment && isEditable(selectedAppointment)"
         (click)="cancelAppointment()"
         class="action-btn danger flex items-center gap-2"
       >
         ❌ Cancelar
       </button>
 
+
       <button
-        *ngIf="!isEditable(selectedAppointment!)"
+        *ngIf="selectedAppointment"
         (click)="openDetail(selectedAppointment!)"
         class="action-btn flex items-center gap-2"
       >
         👁️ Ver detalle
       </button>
 
+
       <!-- ✅ MARCAR COMO COMPLETADA (SOLO DIRECT) -->
       <button
-        *ngIf="selectedAppointment && canCompleteDirect(selectedAppointment)"
-        (click)="completeDirectAppointment()"
+        *ngIf="selectedAppointment && canCompleteAppointment(selectedAppointment)"
+        (click)="completeAppointment()"
         class="action-btn flex items-center gap-2 text-emerald-600"
       >
         ✅ Marcar como completada
@@ -1075,7 +1077,7 @@ export class AppointmentsCalendarPage implements OnInit {
   generateTimeSlots() {
     this.timeSlots = [];
 
-    for (let h = 8; h < 22; h++) {
+    for (let h = 8; h < 23; h++) {
       this.timeSlots.push(`${String(h).padStart(2, '0')}:00`);
       this.timeSlots.push(`${String(h).padStart(2, '0')}:30`);
     }
@@ -1177,28 +1179,6 @@ export class AppointmentsCalendarPage implements OnInit {
     return t >= start && t + this.STEP_MINUTES <= end;
   }
 
-  getDayHeaderLabel(day: string): string {
-    const [y, m, d] = day.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-
-    const days = [
-      'DOMINGO',
-      'LUNES',
-      'MARTES',
-      'MIÉRCOLES',
-      'JUEVES',
-      'VIERNES',
-      'SÁBADO'
-    ];
-
-    const dayName = days[date.getDay()];
-    const dayNumber = String(d).padStart(2, '0');
-    const monthNumber = String(m).padStart(2, '0');
-    const yearNumber = y;
-
-    // ✅ FECHA COMPLETA EN UNA SOLA LÍNEA
-    return `${dayName} ${dayNumber}/${monthNumber}/${yearNumber}`;
-  }
 
   getDayName(day: string): string {
     const [y, m, d] = day.split('-').map(Number);
@@ -1270,17 +1250,28 @@ export class AppointmentsCalendarPage implements OnInit {
 
     const ap = this.selectedAppointment;
 
-    if (ap.patientId == null) {
-      this.closeAppointmentActions();
+    // 🟡 DIRECT → sin paciente
+    if (!ap.patientId) {
+      this.appointmentsService
+        .cancelAppointmentFromAgenda(this.clinicId, ap.id)
+        .subscribe(() => {
+          this.loadAgenda();
+          this.toast.show(
+            'success',
+            'Cita cancelada',
+            'La cita fue cancelada correctamente.'
+          );
+          this.closeAppointmentActions();
+        });
+
       return;
     }
 
+    // 🟢 CLINICAL → con paciente
     this.appointmentsService
       .cancelAppointment(this.clinicId, ap.patientId, ap.id)
       .subscribe(() => {
         this.loadAgenda();
-        this.closeAppointmentActions();
-
         this.toast.show(
           'success',
           'Cita cancelada',
@@ -1343,39 +1334,79 @@ export class AppointmentsCalendarPage implements OnInit {
     this.detailAppointment = undefined;
   }
 
-  canCompleteDirect(ap: Appointment): boolean {
-    return ap.origin === 'DIRECT' && ap.status === 'SCHEDULED';
+  canCompleteAppointment(ap: Appointment): boolean {
+    if (ap.status !== 'SCHEDULED') return false;
+
+    // DIRECT → siempre
+    if (ap.origin === 'DIRECT') return true;
+
+    // CLINICAL → solo el mismo día
+    if (ap.origin === 'CLINICAL') {
+      const today = this.getLocalDateString();
+      return ap.date === today;
+    }
+
+    return false;
   }
 
-  completeDirectAppointment() {
+  completeAppointment() {
     if (!this.selectedAppointment) return;
 
     const ap = this.selectedAppointment;
 
-    this.appointmentsService
-      .completeDirectAppointment(
-        this.clinicId,
-        0,          // 🔥 DIRECT → sin paciente
-        ap.id
-      )
-      .subscribe({
-        next: () => {
-          this.loadAgenda();
-          this.toast.show(
-            'success',
-            'Cita completada',
-            'La cita fue finalizada correctamente.'
-          );
-          this.closeAppointmentActions();
-        },
-        error: () => {
-          this.toast.show(
-            'error',
-            'Error',
-            'No se pudo completar la cita.'
-          );
-        }
-      });
+    // 📞 DIRECT
+    if (ap.origin === 'DIRECT') {
+      this.appointmentsService
+        .completeDirectAppointment(this.clinicId, ap.id)
+        .subscribe({
+          next: () => {
+            this.loadAgenda();
+            this.toast.show(
+              'success',
+              'Cita completada',
+              'La cita fue finalizada correctamente.'
+            );
+            this.closeAppointmentActions();
+          },
+          error: () => {
+            this.toast.show(
+              'error',
+              'Error',
+              'No se pudo completar la cita.'
+            );
+          }
+        });
+      return;
+    }
+
+    // 🦷 CLINICAL
+    if (ap.origin === 'CLINICAL' && ap.patientId) {
+      this.appointmentsService
+        .completeClinicalAppointment(
+          this.clinicId,
+          ap.patientId,
+          ap.id
+        )
+        .subscribe({
+          next: () => {
+            this.loadAgenda();
+            this.toast.show(
+              'success',
+              'Cita completada',
+              'La cita clínica fue finalizada.'
+            );
+            this.closeAppointmentActions();
+          },
+          error: () => {
+            this.toast.show(
+              'error',
+              'Error',
+              'No se pudo completar la cita clínica.'
+            );
+          }
+        });
+    }
   }
+
 
 }

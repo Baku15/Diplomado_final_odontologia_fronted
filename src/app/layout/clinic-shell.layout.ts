@@ -23,6 +23,7 @@ import {
 import { map, firstValueFrom } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../core/services/auth.service';
+import {AlertBellComponent} from '../shared/alerts/alert-bell.component';
 
 interface MeResponse {
   id: number;
@@ -44,6 +45,8 @@ interface MeResponse {
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
+    AlertBellComponent,
+
   ],
   template: `
     <div class="flex min-h-screen bg-slate-100">
@@ -341,6 +344,9 @@ interface MeResponse {
               <span>Completa tu perfil profesional para usar todo el panel.</span>
             </div>
           </div>
+
+          <!-- 🔔 CAMPANITA -->
+          <app-alert-bell></app-alert-bell>
 
           <!-- Avatar + menú tipo YouTube -->
           <div class="relative" #userMenuRoot>

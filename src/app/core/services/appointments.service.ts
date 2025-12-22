@@ -128,15 +128,42 @@ export class AppointmentsService {
 
   completeDirectAppointment(
     clinicId: number,
-    patientId: number,
     appointmentId: number
   ) {
     return this.http.post(
-      `/api/clinic/${clinicId}/patients/${patientId}/appointments/${appointmentId}/complete-direct`,
+      `/api/clinic/${clinicId}/appointments/${appointmentId}/complete-direct`,
       {}
     );
   }
 
+  cancelAppointmentFromAgenda(
+    clinicId: number,
+    appointmentId: number
+  ): Observable<Appointment> {
+    return this.http.post<Appointment>(
+      `/api/clinic/${clinicId}/appointments/${appointmentId}/cancel`,
+      {}
+    );
+  }
+
+
+  completeClinicalAppointment(
+    clinicId: number,
+    patientId: number,
+    appointmentId: number
+  ) {
+    return this.http.post(
+      `/api/clinic/${clinicId}/patients/${patientId}/appointments/${appointmentId}/complete`,
+      {}
+    );
+  }
+
+  getPatientContact(patientId: number) {
+    return this.http.get<{
+      email: string | null;
+      canSendEmail: boolean;
+    }>(`/api/patients/${patientId}/contact`);
+  }
 
 
 }

@@ -13,6 +13,7 @@ import {
 } from '@angular/router';
 import { map } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
+import {AlertBellComponent} from '../shared/alerts/alert-bell.component';
 
 @Component({
   standalone: true,
@@ -25,6 +26,8 @@ import { AuthService } from '../core/services/auth.service';
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
+    AlertBellComponent,
+
   ],
   template: `
     <div class="flex min-h-screen bg-slate-100">
@@ -215,7 +218,8 @@ import { AuthService } from '../core/services/auth.service';
 
           <div class="flex items-center gap-3 text-[11px] md:text-xs">
             <div class="hidden sm:block text-white/80">Sesión iniciada como <span class="font-semibold text-white">{{ (user$ | async)?.username || 'Odontólogo' }}</span></div>
-
+            <!-- 🔔 Campana -->
+            <app-alert-bell></app-alert-bell>
             <!-- Avatar + menú -->
             <div class="relative">
               <button type="button" class="inline-flex items-center justify-center h-9 w-9 rounded-full bg-emerald-200 text-emerald-900 font-semibold text-xs shadow-sm hover:bg-white hover:text-emerald-700" (click)="toggleProfileMenu($event)">

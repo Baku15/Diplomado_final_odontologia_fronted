@@ -49,25 +49,40 @@
 
     <hr>
 
-    <h4>Recordatorios</h4>
+    <h4>Recordatorio por correo</h4>
 
-    <label class="checkbox">
-      <input type="checkbox" [(ngModel)]="sendEmail">
-      Enviar correo electrónico
-    </label>
+    <!-- Cargando -->
+    <div *ngIf="loadingEmail" class="text-xs text-slate-500">
+      Cargando información del paciente…
+    </div>
 
-    <label class="checkbox">
-      <input type="checkbox" [(ngModel)]="sendWhatsapp">
-      Enviar WhatsApp (futuro)
-    </label>
+    <!-- Tiene email -->
+    <div *ngIf="!loadingEmail && canSendEmail && patientEmail">
+      <p class="text-xs text-slate-600 mb-1">
+        📧 Correo del paciente:
+        <strong>{{ patientEmail }}</strong>
+      </p>
 
-    <div class="field">
+      <label class="checkbox">
+        <input type="checkbox" [(ngModel)]="sendEmail" />
+        Enviar recordatorio por correo electrónico
+      </label>
+    </div>
+
+    <!-- No tiene email -->
+    <div *ngIf="!loadingEmail && !canSendEmail" class="text-xs text-amber-700">
+      ⚠️ El paciente no tiene correo electrónico registrado.
+    </div>
+
+    <!-- Recordar antes -->
+    <div class="field mt-2">
       <label>Recordar antes</label>
       <select [(ngModel)]="reminderMinutesBefore">
         <option [value]="1440">24 horas</option>
         <option [value]="2880">48 horas</option>
       </select>
     </div>
+
 
     <p class="warning">
       ⚠️ Cancelaciones con menos de 24 horas pueden generar sanciones.

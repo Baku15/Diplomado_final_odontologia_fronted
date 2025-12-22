@@ -41,11 +41,13 @@ export class CreateAppointmentModal implements OnInit {
   // =========================
   // FORM STATE
   // =========================
+  patientEmail?: string;
+  canSendEmail = false;
+  loadingEmail = false;
   durationMinutes = 30;
   reason = '';
 
   sendEmail = false;
-  sendWhatsapp = false;
   reminderMinutesBefore = 2880;
 
   saving = false;
@@ -61,15 +63,22 @@ export class CreateAppointmentModal implements OnInit {
   // INIT (MODO EDICIÓN)
   // =========================
   ngOnInit(): void {
+
+    // 👉 cargar email SIEMPRE que exista patientId
+    if (this.patientId) {
+      this.loadPatientEmail();
+    }
+
+    // 👉 modo edición
     if (this.editMode && this.appointment) {
       this.durationMinutes = this.appointment.durationMinutes;
       this.reason = this.appointment.reason || '';
       this.sendEmail = !!this.appointment.sendEmail;
-      this.sendWhatsapp = !!this.appointment.sendWhatsapp;
       this.reminderMinutesBefore =
         this.appointment.reminderMinutesBefore ?? 2880;
     }
   }
+
 
   // =========================
   // HELPERS
@@ -153,7 +162,6 @@ export class CreateAppointmentModal implements OnInit {
             durationMinutes: this.durationMinutes,
             reason: this.reason,
             sendEmail: this.sendEmail,
-            sendWhatsapp: this.sendWhatsapp,
             reminderMinutesBefore: this.reminderMinutesBefore
             // ❌ NO origin
             // ❌ NO consultationId
@@ -181,7 +189,6 @@ export class CreateAppointmentModal implements OnInit {
       durationMinutes: this.durationMinutes,
       reason: this.reason,
       sendEmail: this.sendEmail,
-      sendWhatsapp: this.sendWhatsapp,
       reminderMinutesBefore: this.reminderMinutesBefore,
       origin: this.consultationId ? 'CLINICAL' : 'DIRECT',
       consultationId: this.consultationId ?? null
@@ -267,6 +274,34 @@ export class CreateAppointmentModal implements OnInit {
         }
       });
   }
+
+  loadPatientEmail() {
+    if (!this.patientId) return;
+
+    this.loadingEmail = true;
+
+    this.appointmentsService
+      .getPatientContact(this.patientId)
+      .subscribe({
+        next: (res) => {
+          this.patientEmail = res.email ?? undefined;
+          this.canSendEmail = !!res.email;
+          this.loadingEmail = false;
+
+          // 🔒 Si no hay email, forzar sendEmail = false
+          if (!this.canSendEmail) {
+            this.sendEmail = false;
+          }
+        },
+        error: () => {
+          this.loadingEmail = false;
+          this.patientEmail = undefined;
+          this.canSendEmail = false;
+          this.sendEmail = false;
+        }
+      });
+  }
+
 
 
 }

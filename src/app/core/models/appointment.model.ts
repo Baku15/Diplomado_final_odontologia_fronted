@@ -30,4 +30,12 @@ export interface Appointment {
 
   doctorId: number;
   consultationId?: number;
+
+  // ============================
+  // 📧 AUDITORÍA DE RECORDATORIO
+  // ============================
+  emailReminderSentAt?: string | null;
+  emailReminderFailedAt?: string | null;
+  emailReminderError?: string | null;
+
 }
