@@ -387,19 +387,11 @@ import { NavbarComponent } from '../shared/navbar/navbar.component';
           </p>
 
           <div class="cta-row" *ngIf="isBrowser">
-            <button class="btn btn-primary" (click)="goRegistro()">
-              <span>Comenzar registro</span>
-              <span>→</span>
-            </button>
             <button class="btn btn-secondary" (click)="login()">
               Ya tengo cuenta
             </button>
           </div>
 
-          <p class="muted">
-            ¿Ya te registraste y no te llegó el correo?
-            <a href="" (click)="resend($event)">Reenviar enlace de activación</a>
-          </p>
 
           <div class="hero-meta">
             <div class="hero-meta-item">

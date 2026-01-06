@@ -90,7 +90,7 @@ import {AlertBellComponent} from '../shared/alerts/alert-bell.component';
                   <path d="M5 10v9h14v-9" />
                 </svg>
               </span>
-              <span class="truncate" *ngIf="!sidebarCollapsed">Resumen</span>
+              <span class="truncate" *ngIf="!sidebarCollapsed">Dashbord</span>
             </a>
 
             <a

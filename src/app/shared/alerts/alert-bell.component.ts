@@ -1,7 +1,7 @@
 import { Component, inject, HostListener } from '@angular/core';
 import { CommonModule, NgIf, NgFor, AsyncPipe } from '@angular/common';
 import { AlertsService } from '../../core/services/alerts.service';
-import { map } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Component({
   standalone: true,
@@ -131,13 +131,15 @@ export class AlertBellComponent {
   resolve(id: number, event: MouseEvent) {
     event.stopPropagation();
 
-    this.alertsService.resolveAlert(id).subscribe(() => {
+    // El método ahora siempre retorna un Observable
+    const subscription = this.alertsService.resolveAlert(id).subscribe(() => {
       // se actualiza solo por observable
+      subscription.unsubscribe(); // Limpiar suscripción
     });
   }
 
   // 🎨 color por severidad
-  severityClass(sev: string) {
+  severityClass(sev: string): any {
     return {
       'text-red-600': sev === 'CRITICAL',
       'text-amber-600': sev === 'WARNING',

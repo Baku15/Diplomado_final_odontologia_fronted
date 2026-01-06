@@ -1,31 +1,119 @@
-import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { PLATFORM_ID } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
-import {AuthService} from '../core/services/auth.service';
+// src/app/pages/login.page.ts
+import {
+  Component,
+  inject,
+  PLATFORM_ID,
+} from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { AuthService } from '../core/services/auth.service';
+import { Router } from '@angular/router';
 
 @Component({
   standalone: true,
   selector: 'app-login-page',
-  imports: [RouterLink],
-  template: `
-    <section style="max-width:420px;margin:48px auto;padding:24px;border:1px solid #eee;border-radius:12px">
-      <h1 style="margin-top:0">Iniciar sesión</h1>
-      <p>Para entrar, pulsa “Ingresar”. Serás redirigido a la página segura de la clínica para introducir tu usuario y contraseña.</p>
+  imports: [CommonModule],
+  styles: [`
+    :host {
+      display: flex;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #eff6ff, #fef9c3);
+      align-items: center;
+      justify-content: center;
+    }
 
-      <div style="display:flex; gap:8px; margin-top:16px;">
-        <button (click)="ingresar()" style="padding:10px 16px">Ingresar</button>
-        <a routerLink="/registro" style="padding:10px 16px; border:1px solid #ccc; border-radius:6px; text-align:center">Registrarse</a>
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: white;
+      border-radius: 1.25rem;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 25px 60px rgba(15,23,42,.15);
+      border: 1px solid #e5e7eb;
+    }
+
+    h1 {
+      margin: 0 0 .25rem;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    p {
+      margin: 0 0 1.5rem;
+      color: #6b7280;
+      font-size: .95rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: .8rem 1rem;
+      border-radius: .9rem;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      box-shadow: 0 15px 35px rgba(37,99,235,.35);
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .link {
+      margin-top: 1rem;
+      text-align: center;
+      font-size: .9rem;
+      color: #6b7280;
+    }
+
+    .link a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .link a:hover {
+      text-decoration: underline;
+    }
+  `],
+  template: `
+    <div class="card">
+      <h1>Iniciar sesión</h1>
+      <p>Accede a tu cuenta profesional de OdontoWeb</p>
+
+      <button class="btn btn-primary" (click)="login()">
+        <span>Ingresar</span>
+        <span>→</span>
+      </button>
+
+      <div class="link">
+        ¿No tienes cuenta?
+        <a (click)="goRegistro()">Registrarse</a>
       </div>
-    </section>
-  `
+    </div>
+  `,
 })
 export class LoginPage {
-  private platformId = inject(PLATFORM_ID);
   private auth = inject(AuthService);
+  private router = inject(Router);
+  private platformId = inject(PLATFORM_ID);
 
-  ingresar() {
+  login(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    this.auth.startLogin('/admin/solicitudes');
+    // 👇 reutiliza EXACTAMENTE tu flujo actual
+    this.auth.startLogin('/');
+  }
+
+  goRegistro(): void {
+    this.router.navigateByUrl('/registro');
   }
 }

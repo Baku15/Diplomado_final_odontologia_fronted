@@ -1,0 +1,27 @@
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+  <!-- Estados dentales -->
+  <div class="bg-white rounded-lg border p-4">
+    <h3 class="font-semibold mb-2">Estado dental</h3>
+    <div *ngFor="let s of metrics.toothStatus" class="text-sm flex justify-between">
+      <span>{{ s.status }}</span>
+      <span class="font-medium">{{ s.count }}</span>
+    </div>
+  </div>
+
+  <!-- Procedimientos -->
+  <div class="bg-white rounded-lg border p-4">
+    <h3 class="font-semibold mb-2">Procedimientos</h3>
+    <div class="text-sm">Abiertos: <strong>{{ metrics.procedures.open }}</strong></div>
+    <div class="text-sm">Completados: <strong>{{ metrics.procedures.completed }}</strong></div>
+  </div>
+
+  <!-- Carga por diente -->
+  <div class="bg-white rounded-lg border p-4">
+    <h3 class="font-semibold mb-2">Dientes con más carga</h3>
+    <div *ngFor="let t of metrics.toothLoad | slice:0:5" class="text-sm">
+      Diente {{ t.toothNumber }} → {{ t.procedures }} proc.
+    </div>
+  </div>
+
+</div>

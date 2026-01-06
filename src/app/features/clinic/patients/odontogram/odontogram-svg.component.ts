@@ -63,7 +63,19 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
                         </g>
                       </svg>
 
-                      <div *ngIf="badgeCount(n) > 0" class="badge">{{ badgeCount(n) }}</div>
+                      <div *ngIf="badgeCount(n) > 0"
+                           class="badge"
+                           [class.badge-alert]="hasHighLoad(n)"
+                           [title]="hasHighLoad(n) ? 'Alta carga clínica en este diente' : ''">
+                        {{ badgeCount(n) }}
+                      </div>
+
+                      <!-- 🔵 evidencia fotográfica -->
+                      <div *ngIf="hasImage(n)"
+                           class="photo-dot"
+                           title="Este diente tiene evidencia fotográfica">
+                      </div>
+
                     </div>
                   </ng-container>
                 </div>
@@ -97,7 +109,19 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
                         </g>
                       </svg>
 
-                      <div *ngIf="badgeCount(n) > 0" class="badge">{{ badgeCount(n) }}</div>
+                      <div *ngIf="badgeCount(n) > 0"
+                           class="badge"
+                           [class.badge-alert]="hasHighLoad(n)"
+                           [title]="hasHighLoad(n) ? 'Alta carga clínica en este diente' : ''">
+                        {{ badgeCount(n) }}
+                      </div>
+
+                      <!-- 🔵 evidencia fotográfica -->
+                      <div *ngIf="hasImage(n)"
+                           class="photo-dot"
+                           title="Este diente tiene evidencia fotográfica">
+                      </div>
+
                     </div>
                   </ng-container>
                 </div>
@@ -140,7 +164,19 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
                         </g>
                       </svg>
 
-                      <div *ngIf="badgeCount(n) > 0" class="badge">{{ badgeCount(n) }}</div>
+                      <div *ngIf="badgeCount(n) > 0"
+                           class="badge"
+                           [class.badge-alert]="hasHighLoad(n)"
+                           [title]="hasHighLoad(n) ? 'Alta carga clínica en este diente' : ''">
+                        {{ badgeCount(n) }}
+                      </div>
+
+                      <!-- 🔵 evidencia fotográfica -->
+                      <div *ngIf="hasImage(n)"
+                           class="photo-dot"
+                           title="Este diente tiene evidencia fotográfica">
+                      </div>
+
                     </div>
                   </ng-container>
                 </div>
@@ -174,7 +210,18 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
                         </g>
                       </svg>
 
-                      <div *ngIf="badgeCount(n) > 0" class="badge">{{ badgeCount(n) }}</div>
+                      <div *ngIf="badgeCount(n) > 0"
+                           class="badge"
+                           [class.badge-alert]="hasHighLoad(n)"
+                           [title]="hasHighLoad(n) ? 'Alta carga clínica en este diente' : ''">
+                        {{ badgeCount(n) }}
+                      </div>
+                      <!-- 🔵 evidencia fotográfica -->
+                      <div *ngIf="hasImage(n)"
+                           class="photo-dot"
+                           title="Este diente tiene evidencia fotográfica">
+                      </div>
+
                     </div>
                   </ng-container>
                 </div>
@@ -266,6 +313,32 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
 
     .badge { position: absolute; top: -6px; right: -6px; background: #fb7185; color: white; font-size: 10px; padding: 2px 6px; border-radius: 999px; line-height: 1; border: 2px solid white; z-index: 8; }
 
+    .badge-alert {
+      background: #dc2626; /* rojo clínico */
+      animation: pulse 1.4s infinite;
+    }
+
+    /* 🔵 evidencia fotográfica */
+    .photo-dot {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      background: #3b82f6; /* azul clínico */
+      border-radius: 50%;
+      border: 2px solid white;
+      z-index: 9;
+    }
+
+
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(220,38,38,0.6); }
+      70%  { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
+      100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    }
+
     .midline { width: 100%; height: 0; border-top: 2px dashed #e2e8f0; margin: 8px 0; }
 
     .legend { display:flex; gap:10px; align-items:center; flex-wrap:wrap; color: #475569; font-size: 12px; }
@@ -289,7 +362,7 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
 export class OdontogramSvgComponent {
   @Input() teeth: ToothDto[] | undefined;
   @Input() chartProcedures: DentalProcedureDto[] | undefined;
-
+  @Input() teethWithImages: number[] = [];
   @Output() selectTooth = new EventEmitter<{ toothNumber: number; tooth?: ToothDto }>();
   @Output() edit = new EventEmitter<number>();
   @Output() procedure = new EventEmitter<number>();
@@ -357,22 +430,28 @@ export class OdontogramSvgComponent {
   computedFill(n: number): string {
     const t = this.getTooth(n);
 
-    // selected override
-    if (this.selectedNumber === n) return '#dbeafe'; // selected light blue
+    // Selección siempre gana
+    if (this.selectedNumber === n) return '#dbeafe';
 
-    // explicit statuses keep specific palette
+    // Estados clínicos explícitos (siempre ganan)
     if (t) {
       if (t.toothStatus === 'IMPLANTE' || t.toothStatus === 'PROTESIS') return '#ecfdf5';
       if (t.toothStatus === 'EXTRACCION' || t.toothStatus === 'AUSENTE') return '#fff1f2';
       if (t.toothStatus === 'TRATAMIENTO') return '#fffbeb';
-      // if any persistent data, subtle highlight
-      if (this.isPersistent(n)) return '#f0f9ff';
     }
+
+// 🔥 HEATMAP POR CARGA CLÍNICA (prioridad ALTA)
+    const heat = this.getHeatColor(this.getProcedureCount(n));
+    if (heat) return heat;
+
+// Persistencia suave SOLO si no hay carga
+    if (this.isPersistent(n)) return '#f0f9ff';
 
     return '#ffffff';
   }
 
-  /** computed stroke color depending on selection / status */
+
+    /** computed stroke color depending on selection / status */
   computedStroke(n: number): string {
     const t = this.getTooth(n);
     if (this.selectedNumber === n) return '#0369a1'; // strong blue stroke when selected
@@ -430,4 +509,32 @@ export class OdontogramSvgComponent {
   onChip(key: string) {
     this.activeChip = this.activeChip === key ? undefined : key;
   }
+
+  /** Cantidad de procedimientos asociados al diente */
+  getProcedureCount(n: number): number {
+    if (!this.chartProcedures) return 0;
+    return this.chartProcedures.filter(p => p.toothNumber === n).length;
+  }
+
+  /** Color según carga clínica */
+  getHeatColor(count: number): string | null {
+    if (count === 1) return '#e0f2fe';        // azul suave
+    if (count === 2 || count === 3) return '#fed7aa'; // naranja
+    if (count >= 4) return '#fecaca';         // rojo
+    return null;
+  }
+
+  hasHighLoad(n: number): boolean {
+    if (!this.chartProcedures) return false;
+    return this.chartProcedures.filter(p => p.toothNumber === n).length >= 4;
+  }
+
+  hasImage(n: number): boolean {
+    console.log('hasImage?', n, this.teethWithImages);
+    return this.teethWithImages.includes(n);
+  }
+
+
+
+
 }

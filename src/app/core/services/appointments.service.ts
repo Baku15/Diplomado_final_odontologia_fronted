@@ -5,6 +5,8 @@ import { Appointment } from '../models/appointment.model';
 import {DoctorSchedule} from '../models/doctor-schedule.model';
 import {map} from 'rxjs/operators';
 import {environment} from '../../../environments/environment';
+import {AppointmentDashboardMetrics} from '../models/appointment-dashboard-metrics.model';
+import { HttpParams } from '@angular/common/http';
 
 @Injectable({ providedIn: 'root' })
 export class AppointmentsService {
@@ -163,6 +165,161 @@ export class AppointmentsService {
       email: string | null;
       canSendEmail: boolean;
     }>(`/api/patients/${patientId}/contact`);
+  }
+
+  // =========================
+// 📊 DASHBOARD ODONTÓLOGO (HOY)
+// =========================
+  getDoctorDashboardToday() {
+    return this.http.get<{
+      date: string;
+
+      total: number;
+      completed: number;
+      scheduled: number;
+      noShow: number;
+      cancelled: number;
+
+      currentAppointment?: {
+        id: number;
+        patientName: string;
+        startTime: string;
+        endTime: string;
+      } | null;
+
+      nextAppointment?: {
+        id: number;
+        patientName: string;
+        startTime: string;
+        endTime: string;
+      } | null;
+
+      alertsToday: {
+        id: number;
+        type: string;
+        severity: string;
+        message: string;
+      }[];
+    }>(`/api/doctor/dashboard/today`);
+  }
+
+  getAppointmentMetrics() {
+    return this.http.get<{
+      scheduled: number;
+      completed: number;
+      cancelled: number;
+      noShow: number;
+      completionRate: number;
+    }>(`/api/metrics/appointments`);
+  }
+
+  // =========================
+  // DASHBOARD MÉTRICAS
+  // =========================
+  getDoctorAppointmentDashboardMetrics(
+    period: 'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM',
+    start?: string,
+    end?: string
+  ): Observable<AppointmentDashboardMetrics> {
+
+    const params: any = { period };
+
+    if (period === 'CUSTOM') {
+      if (!start || !end) {
+        throw new Error('CUSTOM requiere start y end');
+      }
+      params.start = start;
+      params.end = end;
+    }
+
+    return this.http.get<AppointmentDashboardMetrics>(
+      '/api/dashboard/doctor/appointments',
+      { params }
+    );
+  }
+
+
+  // =========================
+  // LISTADO FILTRADO (DASHBOARD)
+  // =========================
+  // 👉 ESTE ES EL MÉTODO QUE FALTABA
+  getDoctorAppointments(params: {
+    status?: string;
+    date?: string;
+    period: 'TODAY' | 'WEEK' | 'MONTH';
+    page: number;
+    size: number;
+  }) {
+    return this.http.get<{
+      content: Appointment[];
+      last: boolean;
+    }>('/api/doctor/appointments', {
+      params: {
+        period: params.period,
+        page: params.page,
+        size: params.size,
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.date ? { date: params.date } : {})   // 👈 CLAVE
+      }
+    });
+  }
+
+  getDoctorConsultations(params: {
+    status?: string;
+    date?: string;
+    period?: 'TODAY' | 'WEEK' | 'MONTH';
+    page: number;
+    size: number;
+    from?: string;
+    to?: string;
+  }) {
+
+    let httpParams = new HttpParams()
+      .set('page', params.page)
+      .set('size', params.size);
+
+    if (params.period) {
+      httpParams = httpParams.set('period', params.period);
+    }
+
+    if (params.status) {
+      httpParams = httpParams.set('status', params.status);
+    }
+
+    if (params.date) {
+      httpParams = httpParams.set('date', params.date);
+    }
+
+    if (params.from) {
+      httpParams = httpParams.set('from', params.from);
+    }
+
+    if (params.to) {
+      httpParams = httpParams.set('to', params.to);
+    }
+
+    // 🔍 DEBUG FINAL (déjalo ahora)
+    console.log('[SERVICE] consultas params', httpParams.toString());
+
+    return this.http.get<{
+      content: any[];
+      last: boolean;
+    }>('/api/dashboard/doctor/consultations/list', {
+      params: httpParams
+    });
+  }
+// =========================
+// 📊 DASHBOARD CONSULTAS (DOCTOR)
+// =========================
+  getDoctorConsultationDashboardMetrics(
+    period: 'TODAY' | 'WEEK' | 'MONTH'
+  ) {
+    return this.http.get<any>(
+      '/api/dashboard/doctor/consultations',
+      {
+        params: { period }
+      }
+    );
   }
 
 

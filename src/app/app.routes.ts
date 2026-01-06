@@ -23,6 +23,19 @@ export const routes: Routes = [
   // Registro público
   { path: 'registro', component: PublicRegistrationPage },
 
+
+
+  // Registro público
+  { path: 'registro', component: PublicRegistrationPage },
+
+  // 🔐 LOGIN ANGULAR (AQUÍ)
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./pages/login.page').then(
+        (m) => m.LoginPage,
+      ),
+  },
   // ============================
   // ADMIN GLOBAL (SUPERUSER)
   // ============================

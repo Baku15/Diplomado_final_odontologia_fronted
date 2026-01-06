@@ -17,6 +17,7 @@ import { ConsultationService } from '../../../../core/services/consultation.serv
 import { ClinicalConsultationDto } from '../../../../core/models/consultation.model';
 import { CloseConsultationModal } from '../../consultations/close-consultation.modal';
 import { DatePipe } from '@angular/common';
+import {OdontogramMetricsComponent} from './metrics/odontogram-metrics.component';
 
 @Component({
   standalone: true,
@@ -27,7 +28,8 @@ import { DatePipe } from '@angular/common';
     RouterLink,
     FormsModule,
     CloseConsultationModal,
-    DatePipe
+    DatePipe,
+    OdontogramMetricsComponent
   ],
   template: `
     <div class="max-w-7xl mx-auto px-4 py-6">
@@ -100,8 +102,14 @@ import { DatePipe } from '@angular/common';
       <!-- MAIN LAYOUT -->
       <div *ngIf="!loading && !error && chart" class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
 
-        <!-- LEFT: odontograma SVG (only the drawing) -->
-        <div>
+        <!-- LEFT: métricas + odontograma -->
+        <div class="space-y-4">
+
+          <!-- 🔢 MÉTRICAS DEL ODONTOGRAMA -->
+          <app-odontogram-metrics
+            [chart]="chart">
+          </app-odontogram-metrics>
+
 
           <app-odontogram-svg
             [teeth]="chart.teeth ?? []"
@@ -688,6 +696,7 @@ export class OdontogramPage implements OnInit {
   private consultationService = inject(ConsultationService);
   private consultationExplicitlyClosed = false;
 
+  teethWithImages = new Set<number>();
 
   uploadMessage: string | null = null;
   uploadError: string | null = null;
@@ -919,11 +928,23 @@ export class OdontogramPage implements OnInit {
         ev.toothNumber
       );
 
+// 👉 marcar diente con evidencia fotográfica
+      if (attachments.length > 0) {
+        this.teethWithImages.add(ev.toothNumber);
+      }
+
+// mantener previews
+      this.selectedToothImages = attachments;
+      this.toothAttachments = attachments.slice(0, 3);
+
+
       // 👉 lista completa (para modal)
       this.selectedToothImages = attachments;
 
       // 👉 preview (máx 3)
       this.toothAttachments = attachments.slice(0, 3);
+      this.teethWithImages.add(this.selectedToothNumber);
+
     }
 
     const edited = this.isToothEdited(ev.toothNumber);

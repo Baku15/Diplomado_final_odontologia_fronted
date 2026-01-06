@@ -1,0 +1,43 @@
+<!-- src/app/features/dentist/patients/patient-dashboard-metrics.component.html -->
+<section class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+  <div class="bg-white rounded-2xl border p-5 shadow">
+    <p class="text-xs text-slate-500">Total pacientes</p>
+    <p class="text-2xl font-bold">{{ metrics.totalPatients }}</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border p-5 shadow">
+    <p class="text-xs text-slate-500">Pacientes nuevos</p>
+    <p class="text-2xl font-bold text-emerald-600">{{ metrics.newPatients }}</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border p-5 shadow">
+    <p class="text-xs text-slate-500">En tratamiento</p>
+    <p class="text-2xl font-bold text-blue-600">{{ metrics.patientsInTreatment }}</p>
+  </div>
+
+  <div class="bg-white rounded-2xl border p-5 shadow">
+    <p class="text-xs text-slate-500">En riesgo</p>
+    <p class="text-2xl font-bold text-red-500">{{ metrics.patientsAtRisk }}</p>
+  </div>
+
+  <!-- DONUT -->
+  <div class="bg-white rounded-2xl border p-6 shadow lg:col-span-2">
+    <h3 class="font-semibold mb-2">Distribución de pacientes</h3>
+
+    <app-donut-chart
+      [slices]="donutSlices"
+      (sliceClick)="onDonutClick($event)">
+    </app-donut-chart>
+  </div>
+
+  <!-- BAR -->
+  <div class="bg-white rounded-2xl border p-6 shadow lg:col-span-2">
+    <h3 class="font-semibold mb-2">Actividad por fecha</h3>
+
+    <app-bar-chart
+      [items]="barItems">
+    </app-bar-chart>
+  </div>
+
+</section>
